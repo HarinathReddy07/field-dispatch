@@ -4,9 +4,13 @@ import helmet from 'helmet';
 import { ZodValidationPipe, patchNestJsSwagger } from 'nestjs-zod';
 import type { Env } from '@dispatch/config';
 import { AllExceptionsFilter } from './common/exception.filter';
+import { RedisIoAdapter } from './modules/realtime/redis-io.adapter';
 
 /** HTTP configuration shared by main.ts and the test harness so tests exercise the real pipeline. */
-export function configureApp(app: NestExpressApplication, env: Env): void {
+export async function configureApp(app: NestExpressApplication, env: Env): Promise<void> {
+  const ws = new RedisIoAdapter(app, env);
+  await ws.connectToRedis();
+  app.useWebSocketAdapter(ws);
   app.setGlobalPrefix('api/v1', { exclude: ['health/live', 'health/ready'] });
   app.set('trust proxy', 1);
   app.use(helmet());

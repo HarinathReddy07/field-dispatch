@@ -13,7 +13,7 @@ async function main(): Promise<void> {
     bodyParser: false,
   });
   app.useLogger(app.get(Logger));
-  configureApp(app, env);
+  await configureApp(app, env);
   await app.listen(env.PORT, '0.0.0.0');
   app.get(Logger).log(`API listening on :${env.PORT}`);
 }

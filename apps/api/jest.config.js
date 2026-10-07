@@ -25,6 +25,7 @@ module.exports = {
     },
   ],
   testTimeout: 120000,
+  maxWorkers: 3, // each suite boots a full Nest app + argon2; more parallelism starves small machines
   collectCoverageFrom: ['src/domain/**/*.ts', 'src/modules/requests/dispatch*.ts', '!**/*.spec.ts'],
   coverageThreshold: undefined,
 };
