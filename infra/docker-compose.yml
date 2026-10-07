@@ -132,11 +132,11 @@ services:
     build:
       context: ..
       dockerfile: apps/admin/Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
     environment:
       API_INTERNAL_URL: http://api:3000
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:3000}
+      # Plain HTTP local demo only. Unset it (secure cookies) behind HTTPS.
+      ADMIN_COOKIE_SECURE: ${ADMIN_COOKIE_SECURE:-false}
     depends_on:
       api:
         condition: service_healthy

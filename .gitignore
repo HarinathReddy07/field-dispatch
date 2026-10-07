@@ -8,3 +8,5 @@ coverage
 *.log
 .turbo
 .expo
+test-results
+playwright-report
