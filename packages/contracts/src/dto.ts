@@ -171,6 +171,7 @@ export const RequestViewSchema = z.object({
   quoteMinor: z.number().int().nullable(),
   startedAt: z.string().nullable(),
   reviewDeadlineAt: z.string().nullable(),
+  updatedAt: z.string(),
   technician: z.object({ id: z.string().uuid(), name: z.string(), rating: z.number() }).nullable(),
   settlement: z
     .object({ amountMinor: z.number().int(), status: SettlementStatusSchema, providerRef: z.string() })

@@ -41,6 +41,7 @@ export function toView(row: ViewRow): RequestView {
     quoteMinor: row.quote_minor,
     startedAt: row.started_at?.toISOString() ?? null,
     reviewDeadlineAt: row.review_deadline_at?.toISOString() ?? null,
+    updatedAt: row.updated_at.toISOString(),
     technician: row.technician,
     settlement: row.settlement
       ? {
