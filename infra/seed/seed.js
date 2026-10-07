@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports, no-console */
 'use strict';
 const { Client } = require('pg');
 const argon2 = require('argon2');
