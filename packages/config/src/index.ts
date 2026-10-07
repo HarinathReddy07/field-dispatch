@@ -29,6 +29,8 @@ export const EnvSchema = z.object({
   THROTTLE_ARRIVE_PER_MIN: z.coerce.number().int().positive().default(10),
   THROTTLE_DEFAULT_PER_MIN: z.coerce.number().int().positive().default(300),
   S3_ENDPOINT: z.string().url(),
+  /** Endpoint embedded in presigned URLs (what clients can reach). Defaults to S3_ENDPOINT. */
+  S3_PUBLIC_ENDPOINT: z.string().url().optional(),
   S3_REGION: z.string().default('us-east-1'),
   S3_BUCKET: z.string().min(3),
   S3_ACCESS_KEY: z.string().min(1),
