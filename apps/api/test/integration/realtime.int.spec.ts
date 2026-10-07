@@ -106,6 +106,7 @@ describe('realtime (Socket.io)', () => {
   it('losing concurrent confirms emit nothing (events only follow a committed transaction)', async () => {
     const admin = await connect('admin');
     const id = await flow.create('requester1');
+    await flow.get('requester1', `/requests/${id}/nearby-technicians`); // -> MATCHED
     const results = await Promise.all(Array.from({ length: 6 }, () => flow.confirm(id, 1, 'requester1')));
     expect(results.filter((r) => r.status === 200)).toHaveLength(1);
     await waitFor(() => types(admin, id).includes('assignment.created'), 5000, 'winner event');
@@ -116,7 +117,7 @@ describe('realtime (Socket.io)', () => {
         (e) =>
           e.requestId === id &&
           e.type === 'request.state.changed' &&
-          (e.data as { to?: string }).to === 'ASSIGNED',
+          (e.data as { to?: string }).to === 'CONFIRMED',
       ),
     ).toHaveLength(1);
     admin.socket.close();
@@ -131,8 +132,7 @@ describe('realtime (Socket.io)', () => {
     await flow.stop(id, tech);
     await flow.review(id, { decision: 'REQUEST_REWORK', reason: 'Need clearer photos' });
     await waitFor(() => types(t1!, id).includes('review.requested'), 5000, 'review.requested to technician');
-    await flow.start(id, tech);
-    await flow.twoImages(id, tech);
+    await flow.twoImages(id, tech); // REWORK: new proof, no restart
     await flow.stop(id, tech);
     await flow.review(id, { decision: 'APPROVE' });
     await waitFor(
@@ -162,14 +162,18 @@ describe('realtime (Socket.io)', () => {
       .filter((e) => e.requestId === id && e.type === 'request.state.changed')
       .map((e) => (e.data as { to: string }).to);
     expect(states).toEqual([
-      'ASSIGNED',
+      'REQUESTED',
+      'MATCHED',
+      'CONFIRMED',
       'ARRIVED',
       'IN_PROGRESS',
+      'PROOF_UPLOADED',
       'UNDER_REVIEW',
-      'REWORK_REQUESTED',
-      'IN_PROGRESS',
+      'REWORK',
+      'PROOF_UPLOADED',
       'UNDER_REVIEW',
       'COMPLETED',
+      'SETTLED',
     ]);
     [r1, t1, t2, admin].forEach((c) => c!.socket.close());
   });

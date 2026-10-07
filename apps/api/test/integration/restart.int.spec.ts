@@ -24,7 +24,7 @@ describe('A7 restart resilience', () => {
         .get(`/api/v1/requests/${id}`)
         .set('Authorization', `Bearer ${staleToken}`);
       expect(view.status).toBe(200);
-      expect(view.body.state).toBe('ASSIGNED');
+      expect(view.body.state).toBe('CONFIRMED');
       // the OTP issued by the previous process verifies on the new one (state lives in PostgreSQL)
       const arrive = await f2.arrive(id, 'tech1', otp);
       expect(arrive.status).toBe(200);
@@ -65,13 +65,13 @@ describe('A7 restart resilience', () => {
       ]);
       expect(rows[0]!.state === 'UNDER_REVIEW' || Date.now() >= deadline).toBe(true);
       let state = 'UNDER_REVIEW';
-      for (let i = 0; i < 60 && state !== 'COMPLETED'; i++) {
+      for (let i = 0; i < 60 && state !== 'SETTLED'; i++) {
         await new Promise((r) => setTimeout(r, 250));
         state = (
           await app2.sql<{ state: string }>(`SELECT state FROM service_requests WHERE id = $1`, [id])
         )[0]!.state;
       }
-      expect(state).toBe('COMPLETED');
+      expect(state).toBe('SETTLED');
       expect(Date.now()).toBeGreaterThanOrEqual(deadline);
       expect(await app2.sql(`SELECT 1 FROM settlements WHERE request_id = $1`, [id])).toHaveLength(1);
       const ev = await app2.sql<{ actor_role: string }>(

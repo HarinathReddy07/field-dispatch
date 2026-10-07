@@ -34,7 +34,7 @@ describe('job lifecycle', () => {
 
     const approved = await flow.review(id, { decision: 'APPROVE' });
     expect(approved.status).toBe(200);
-    expect(approved.body.state).toBe('COMPLETED');
+    expect(approved.body.state).toBe('SETTLED');
     expect(approved.body.settlement).toMatchObject({
       amountMinor: approved.body.quoteMinor,
       status: 'SETTLED',
@@ -47,12 +47,16 @@ describe('job lifecycle', () => {
       [id],
     );
     expect(events.map((e) => e.state_to)).toEqual([
-      'CREATED',
-      'ASSIGNED',
+      'DRAFT',
+      'REQUESTED',
+      'MATCHED',
+      'CONFIRMED',
       'ARRIVED',
       'IN_PROGRESS',
+      'PROOF_UPLOADED',
       'UNDER_REVIEW',
       'COMPLETED',
+      'SETTLED',
     ]);
     const tech1 = await ctx.sql<{ availability_status: string }>(
       `SELECT availability_status FROM technicians WHERE user_id = $1`,
@@ -91,11 +95,9 @@ describe('job lifecycle', () => {
       'requester2',
     );
     expect(rework.status).toBe(200);
-    expect(rework.body.state).toBe('REWORK_REQUESTED');
-
-    const restarted = await flow.start(id, tech);
-    expect(restarted.body.state).toBe('IN_PROGRESS');
-    expect(restarted.body.workCycle).toBe(2);
+    expect(rework.body.state).toBe('REWORK');
+    expect(rework.body.workCycle).toBe(2); // a rework opens a new proof cycle
+    expect((await flow.start(id, tech)).status).toBe(409); // no restart: REWORK goes straight to new proof
     const gated = await flow.stop(id, tech);
     expect(gated.body.code).toBe('EVIDENCE_REQUIRED'); // cycle-1 images don't count
     expect(gated.body.details).toEqual({ required: 2, finalized: 0 });
@@ -103,7 +105,7 @@ describe('job lifecycle', () => {
     await flow.twoImages(id, tech);
     expect((await flow.stop(id, tech)).body.state).toBe('UNDER_REVIEW');
     const done = await flow.review(id, { decision: 'APPROVE' }, 'requester2');
-    expect(done.body.state).toBe('COMPLETED');
+    expect(done.body.state).toBe('SETTLED');
 
     const media = await ctx.sql<{ work_cycle: number; n: number }>(
       `SELECT work_cycle, count(*)::int AS n FROM evidence_media WHERE request_id = $1 AND status = 'FINALIZED' GROUP BY 1 ORDER BY 1`,
@@ -158,13 +160,15 @@ describe('job lifecycle', () => {
       },
       null,
     );
-    expect(intent.status).toBe(409); // evidence only while IN_PROGRESS
+    expect(intent.status).toBe(409); // evidence only while IN_PROGRESS or REWORK
   });
 
   it('requester can cancel before work starts, freeing the technician', async () => {
     const id = await flow.assigned(8, 'requester3');
     const res = await flow.post('requester3', `/requests/${id}/cancel`);
-    expect(res.body.state).toBe('CANCELLED');
+    expect(res.body).toMatchObject({ state: 'REQUESTED', quoteMinor: null, technician: expect.anything() }); // booking released
+    const final = await flow.post('requester3', `/requests/${id}/cancel`); // no booking now: cancels outright
+    expect(final.body.state).toBe('CANCELLED');
     const t = await ctx.sql<{ availability_status: string }>(
       `SELECT availability_status FROM technicians WHERE user_id = $1`,
       [TECH_ID(8)],
@@ -173,11 +177,38 @@ describe('job lifecycle', () => {
     expect((await flow.start(id, 'tech8')).status).toBe(404); // assignment ended
   });
 
+  it('edit goes REQUESTED -> DRAFT -> REQUESTED with both transitions recorded, and stops once matched', async () => {
+    const id = await flow.create('requester1');
+    const auth = { Authorization: `Bearer ${await flow.token('requester1')}` };
+    const patch = (body: object, headers = auth) =>
+      ctx.http().patch(`/api/v1/requests/${id}`).set(headers).send(body);
+
+    const ok = await patch({ notes: 'Gate code 1234', assetId: 'PANEL-EDITED' });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ state: 'REQUESTED', notes: 'Gate code 1234', assetId: 'PANEL-EDITED' });
+    const actions = await ctx.sql<{ action: string }>(
+      `SELECT action FROM job_events WHERE request_id = $1 ORDER BY seq`,
+      [id],
+    );
+    expect(actions.map((a) => a.action)).toEqual(['CREATE', 'SUBMIT', 'EDIT', 'SUBMIT']);
+
+    expect((await patch({})).status).toBe(400); // nothing to change
+    expect((await patch({ state: 'SETTLED' })).status).toBe(400); // mass assignment
+    expect((await patch({ windowStart: new Date(Date.now() + 3600e3).toISOString() })).status).toBe(400);
+    const other = { Authorization: `Bearer ${await flow.token('requester2')}` };
+    expect((await patch({ notes: 'hijack' }, other)).status).toBe(404);
+
+    await flow.get('requester1', `/requests/${id}/nearby-technicians`); // -> MATCHED
+    const late = await patch({ notes: 'too late' });
+    expect(late.status).toBe(409);
+    expect(late.body.code).toBe('ILLEGAL_TRANSITION');
+  });
+
   it('snapshot returns current state plus missed events after a cursor', async () => {
     const id = await flow.assigned(8, 'requester3');
     const snap = await flow.get('requester3', `/requests/${id}/snapshot`);
     expect(snap.status).toBe(200);
-    expect(snap.body.request.state).toBe('ASSIGNED');
+    expect(snap.body.request.state).toBe('CONFIRMED');
     const types = snap.body.events.map((e: { type: string }) => e.type);
     expect(types).toEqual(
       expect.arrayContaining(['request.created', 'request.state.changed', 'assignment.created']),
@@ -188,7 +219,7 @@ describe('job lifecycle', () => {
     }
     const next = await flow.get('requester3', `/requests/${id}/snapshot?since=${snap.body.cursor}`);
     expect(next.body.events).toEqual([]);
-    expect(next.body.request.state).toBe('ASSIGNED');
+    expect(next.body.request.state).toBe('CONFIRMED');
     expect((await flow.get('requester1', `/requests/${id}/snapshot`)).status).toBe(404);
     expect(ACCOUNTS.admin).toBeTruthy();
   });

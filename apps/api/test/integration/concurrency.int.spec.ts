@@ -23,9 +23,13 @@ describe('concurrent confirmation (A4)', () => {
   });
   afterAll(() => ctx.close());
 
-  const create = async (token: string) =>
-    (await ctx.http().post(`${API}/requests`).set('Authorization', `Bearer ${token}`).send(newRequestBody()))
-      .body.id as string;
+  /** Creates a request and runs the nearby search so it is MATCHED (the only state confirm accepts). */
+  const create = async (token: string) => {
+    const auth = { Authorization: `Bearer ${token}` };
+    const id = (await ctx.http().post(`${API}/requests`).set(auth).send(newRequestBody())).body.id as string;
+    await ctx.http().get(`${API}/requests/${id}/nearby-technicians`).set(auth);
+    return id;
+  };
 
   const confirm = (token: string, id: string, technicianId: string) =>
     ctx
@@ -89,8 +93,8 @@ describe('concurrent confirmation (A4)', () => {
         `SELECT state FROM service_requests WHERE id = ANY($1::uuid[])`,
         [ids],
       );
-      expect(states.filter((s) => s.state === 'ASSIGNED')).toHaveLength(1);
-      expect(states.filter((s) => s.state === 'CREATED')).toHaveLength(9);
+      expect(states.filter((s) => s.state === 'CONFIRMED')).toHaveLength(1);
+      expect(states.filter((s) => s.state === 'MATCHED')).toHaveLength(9);
       const confirms = await ctx.sql(
         `SELECT 1 FROM job_events WHERE request_id = ANY($1::uuid[]) AND action = 'CONFIRM'`,
         [ids],

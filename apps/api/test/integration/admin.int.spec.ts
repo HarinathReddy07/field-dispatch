@@ -89,8 +89,8 @@ describe('A5 authorization and admin operations', () => {
     expect(ids).toEqual(expect.arrayContaining([a, b]));
     expect(all.body.total).toBe(all.body.items.length);
 
-    const assigned = await flow.get('admin', '/admin/jobs?state=ASSIGNED&pageSize=100');
-    expect(assigned.body.items.every((i: { state: string }) => i.state === 'ASSIGNED')).toBe(true);
+    const assigned = await flow.get('admin', '/admin/jobs?state=CONFIRMED&pageSize=100');
+    expect(assigned.body.items.every((i: { state: string }) => i.state === 'CONFIRMED')).toBe(true);
     const page = await flow.get('admin', '/admin/jobs?pageSize=1&page=2');
     expect(page.body.items).toHaveLength(1);
     expect(page.body.page).toBe(2);
@@ -104,7 +104,12 @@ describe('A5 authorization and admin operations', () => {
 
     const detail = await flow.get('admin', `/admin/jobs/${a}`);
     expect(detail.body.job.id).toBe(a);
-    expect(detail.body.events.map((e: { state_to: string }) => e.state_to)).toEqual(['CREATED', 'ASSIGNED']);
+    expect(detail.body.events.map((e: { state_to: string }) => e.state_to)).toEqual([
+      'DRAFT',
+      'REQUESTED',
+      'MATCHED',
+      'CONFIRMED',
+    ]);
     expect(detail.body.assignments).toHaveLength(1);
     expect(detail.body.audit.length).toBeGreaterThanOrEqual(3);
     expect((await flow.get('admin', `/admin/jobs/00000000-0000-4000-8000-0000000000ff`)).status).toBe(404);
@@ -114,7 +119,7 @@ describe('A5 authorization and admin operations', () => {
     expect(techs.body.find((t: { id: string }) => t.id === TECH_ID(1)).current_request_id).toBe(a);
 
     const summary = await flow.get('admin', '/admin/summary');
-    expect(summary.body.countsByState.ASSIGNED).toBeGreaterThanOrEqual(1);
+    expect(summary.body.countsByState.CONFIRMED).toBeGreaterThanOrEqual(1);
     expect(summary.body.activeRequests).toBeGreaterThanOrEqual(2);
     expect(summary.body.activeTechnicians).toBeGreaterThanOrEqual(1);
     expect(typeof summary.body.exceptionCount).toBe('number');
@@ -125,7 +130,7 @@ describe('A5 authorization and admin operations', () => {
     await ctx.sql(`UPDATE technicians SET last_seen_at = now() - interval '2 days' WHERE user_id = $1`, [
       TECH_ID(1),
     ]);
-    const board = await flow.get('admin', '/admin/jobs?state=ASSIGNED&pageSize=100');
+    const board = await flow.get('admin', '/admin/jobs?state=CONFIRMED&pageSize=100');
     expect(board.body.items.find((i: { id: string }) => i.id === id).exceptionFlags).toContain(
       'TECHNICIAN_STALE',
     );
@@ -170,7 +175,7 @@ describe('A5 authorization and admin operations', () => {
       null,
     );
     expect(res.status).toBe(200);
-    expect(res.body.state).toBe('ASSIGNED');
+    expect(res.body.state).toBe('CONFIRMED');
     expect(res.body.technician.id).toBe(TECH_ID(2));
 
     const status = await ctx.sql<{ user_id: string; availability_status: string }>(
@@ -214,7 +219,7 @@ describe('A5 authorization and admin operations', () => {
       { technicianId: TECH_ID(4), reason: 'Technician left the site' },
       null,
     );
-    expect(res.body).toMatchObject({ state: 'ASSIGNED', workCycle: 2, startedAt: null });
+    expect(res.body).toMatchObject({ state: 'CONFIRMED', workCycle: 2, startedAt: null });
     expect(res.body.technician.id).toBe(TECH_ID(4));
     expect((await flow.get('tech1', `/requests/${id}`)).status).toBe(200); // history still readable
     expect((await flow.uploadEvidence(id, 'tech1')).status).toBe(404);

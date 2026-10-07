@@ -56,7 +56,7 @@ export class Flow {
     for (const id of ids) {
       const job = await this.get('admin', `/admin/jobs/${id}`);
       const state = job.body?.job?.state as string | undefined;
-      if (state && state !== 'COMPLETED' && state !== 'CANCELLED') {
+      if (state && state !== 'SETTLED' && state !== 'CANCELLED') {
         await this.post('admin', `/admin/jobs/${id}/cancel`, { reason: 'test cleanup' }, null);
       }
     }
@@ -68,6 +68,7 @@ export class Flow {
 
   async assigned(techN = 1, requester: Who = 'requester1'): Promise<string> {
     const id = await this.create(requester);
+    await this.get(requester, `/requests/${id}/nearby-technicians`); // REQUESTED -> MATCHED
     const res = await this.confirm(id, techN, requester);
     if (res.status !== 200) throw new Error(`confirm failed: ${res.status} ${JSON.stringify(res.body)}`);
     return id;

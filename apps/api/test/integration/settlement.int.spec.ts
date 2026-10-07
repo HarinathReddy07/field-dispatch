@@ -64,7 +64,7 @@ describe('A6 settlement idempotency and the review-timeout sweeper', () => {
     expect(await sweeper().runOnce()).toBe(1);
 
     const view = await flow.get('requester1', `/requests/${id}`);
-    expect(view.body.state).toBe('COMPLETED');
+    expect(view.body.state).toBe('SETTLED');
     expect(view.body.settlement.status).toBe('SETTLED');
     expect(await settlements(id)).toHaveLength(1);
     const ev = await ctx.sql<{ actor_role: string; actor_id: string | null; action: string }>(
@@ -104,7 +104,7 @@ describe('A6 settlement idempotency and the review-timeout sweeper', () => {
     await sweeper().runOnce();
     for (const id of ids) {
       expect(await settlements(id)).toHaveLength(1);
-      expect((await flow.get('requester1', `/requests/${id}`)).body.state).toBe('COMPLETED');
+      expect((await flow.get('requester1', `/requests/${id}`)).body.state).toBe('SETTLED');
     }
     expect(counts.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(3);
   });

@@ -82,7 +82,7 @@ describe('A3 arrival OTP security', () => {
     const locked = await flow.arrive(id, 'tech4', otp); // correct code, but locked
     expect(locked.status).toBe(429);
     expect(locked.body.code).toBe('OTP_LOCKED');
-    expect((await flow.get('requester1', `/requests/${id}`)).body.state).toBe('ASSIGNED');
+    expect((await flow.get('requester1', `/requests/${id}`)).body.state).toBe('CONFIRMED');
     const audit = await ctx.sql<{ action: string }>(
       `SELECT action FROM audit_logs WHERE request_id = $1 AND action LIKE 'otp.%' ORDER BY seq`,
       [id],

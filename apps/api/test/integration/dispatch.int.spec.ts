@@ -17,7 +17,7 @@ describe('create -> nearby -> confirm', () => {
   it('creates a request, ranks eligible technicians, confirms atomically and idempotently', async () => {
     const created = await ctx.http().post(`${API}/requests`).set(auth(requester)).send(newRequestBody());
     expect(created.status).toBe(201);
-    expect(created.body.state).toBe('CREATED');
+    expect(created.body.state).toBe('REQUESTED');
     const id = created.body.id as string;
 
     const nearby = await ctx.http().get(`${API}/requests/${id}/nearby-technicians`).set(auth(requester));
@@ -42,7 +42,7 @@ describe('create -> nearby -> confirm', () => {
     ]);
 
     const stateAfterSearch = await ctx.http().get(`${API}/requests/${id}`).set(auth(requester));
-    expect(stateAfterSearch.body.state).toBe('MATCHING');
+    expect(stateAfterSearch.body.state).toBe('MATCHED');
 
     const key = idemKey();
     const confirm = () =>
@@ -54,7 +54,7 @@ describe('create -> nearby -> confirm', () => {
         .send({ technicianId: TECH_ID(1) });
     const first = await confirm();
     expect(first.status).toBe(200);
-    expect(first.body.state).toBe('ASSIGNED');
+    expect(first.body.state).toBe('CONFIRMED');
     expect(first.body.technician.id).toBe(TECH_ID(1));
     expect(first.body.quoteMinor).toBe(list[0]!.quoteMinor); // server quote == quote shown in options
 
@@ -85,13 +85,14 @@ describe('create -> nearby -> confirm', () => {
       `SELECT action FROM job_events WHERE request_id = $1 ORDER BY seq`,
       [id],
     );
-    expect(events.map((e) => e.action)).toEqual(['CREATE', 'SEARCH', 'CONFIRM']);
+    expect(events.map((e) => e.action)).toEqual(['CREATE', 'SUBMIT', 'SEARCH', 'CONFIRM']);
     const audit = await ctx.sql<{ action: string }>(
       `SELECT action FROM audit_logs WHERE request_id = $1 ORDER BY seq`,
       [id],
     );
     expect(audit.map((a) => a.action)).toEqual([
       'request.create',
+      'request.submit',
       'request.search',
       'request.confirm',
       'assignment.create',
@@ -101,9 +102,10 @@ describe('create -> nearby -> confirm', () => {
       [id],
     );
     expect(outbox.map((o) => o.type)).toEqual([
+      'request.state.changed', // DRAFT -> REQUESTED
       'request.created',
-      'request.state.changed',
-      'request.state.changed',
+      'request.state.changed', // REQUESTED -> MATCHED
+      'request.state.changed', // MATCHED -> CONFIRMED
       'assignment.created',
     ]);
     const tech = await ctx.sql<{ availability_status: string }>(
@@ -116,6 +118,16 @@ describe('create -> nearby -> confirm', () => {
   it('rejects confirming an ineligible technician and a closed request', async () => {
     const r = await ctx.http().post(`${API}/requests`).set(auth(requester)).send(newRequestBody());
     const id = r.body.id as string;
+    // confirming before searching is refused: the booking must come from a MATCHED request
+    const early = await ctx
+      .http()
+      .post(`${API}/requests/${id}/confirm`)
+      .set(auth(requester))
+      .set('Idempotency-Key', idemKey())
+      .send({ technicianId: TECH_ID(1) });
+    expect(early.status).toBe(409);
+    expect(early.body.code).toBe('STATE_CONFLICT');
+    await ctx.http().get(`${API}/requests/${id}/nearby-technicians`).set(auth(requester));
     for (const n of [3, 5, 6, 7]) {
       const res = await ctx
         .http()
@@ -132,12 +144,12 @@ describe('create -> nearby -> confirm', () => {
     const history = await ctx.http().get(`${API}/requests/history`).set(auth(requester));
     expect(history.status).toBe(200);
     expect(history.body.length).toBeGreaterThanOrEqual(1);
-    const completed = history.body.find((x: { state: string }) => x.state === 'COMPLETED');
+    const completed = history.body.find((x: { state: string }) => x.state === 'SETTLED');
     expect(completed.settlement.amountMinor).toBe(52500);
 
     const reorder = await ctx.http().post(`${API}/requests/${completed.id}/reorder`).set(auth(requester));
     expect(reorder.status).toBe(201);
-    expect(reorder.body.state).toBe('CREATED');
+    expect(reorder.body.state).toBe('REQUESTED');
     expect(reorder.body.assetId).toBe(completed.assetId);
     expect(reorder.body.id).not.toBe(completed.id);
 

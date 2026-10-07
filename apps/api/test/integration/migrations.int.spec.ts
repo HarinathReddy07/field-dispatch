@@ -121,7 +121,7 @@ describe('migrations: constraints reject violations', () => {
   it('blocks UPDATE, DELETE and TRUNCATE on job_events', async () => {
     const req = await request(await user('REQUESTER'));
     await c.query(
-      `INSERT INTO job_events (request_id, state_to, action, actor_role) VALUES ($1,'CREATED','CREATE','SYSTEM')`,
+      `INSERT INTO job_events (request_id, state_to, action, actor_role) VALUES ($1,'DRAFT','CREATE','SYSTEM')`,
       [req],
     );
     expect(await code(c.query(`UPDATE job_events SET reason = 'x'`))).toBe('23001');
