@@ -1,0 +1,65 @@
+// Prisma mirrors the hand-written SQL migrations in infra/migrations (the SQL is the source of truth;
+// Prisma never runs migrations). PostGIS / range columns are `Unsupported` and only touched via raw SQL.
+// See docs/adr/0001-prisma-with-raw-sql.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String
+  passwordHash String   @map("password_hash")
+  role         String
+  name         String
+  rating       Decimal  @default(0) @db.Decimal(2, 1)
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("users")
+}
+
+model Technician {
+  userId             String                                @id @map("user_id") @db.Uuid
+  serviceCategories  String[]                              @map("service_categories")
+  availabilityStatus String                                @default("OFFLINE") @map("availability_status")
+  location           Unsupported("geography(Point,4326)")?
+  lastSeenAt         DateTime?                             @map("last_seen_at") @db.Timestamptz(6)
+  createdAt          DateTime                              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("technicians")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  familyId   String    @map("family_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  replacedBy String?   @map("replaced_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("refresh_tokens")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  seq           BigInt   @unique @default(autoincrement())
+  actorId       String?  @map("actor_id") @db.Uuid
+  actorRole     String   @map("actor_role")
+  action        String
+  entityType    String   @map("entity_type")
+  entityId      String   @map("entity_id")
+  requestId     String?  @map("request_id") @db.Uuid
+  correlationId String?  @map("correlation_id")
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("audit_logs")
+}
