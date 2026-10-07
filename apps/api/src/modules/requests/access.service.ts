@@ -24,6 +24,20 @@ export class AccessService {
     return user.role === 'TECHNICIAN' && row.is_tech;
   }
 
+  /** Live-room eligibility is stricter than read access: technicians need the ACTIVE assignment. */
+  async canSubscribe(db: Db, user: Pick<AuthUser, 'id' | 'role'>, requestId: string): Promise<boolean> {
+    const rows = await db.$queryRaw<{ requester_id: string; is_active_tech: boolean }[]>`
+      SELECT r.requester_id::text AS requester_id,
+             EXISTS (SELECT 1 FROM assignments a
+                     WHERE a.request_id = r.id AND a.technician_id = ${user.id}::uuid AND a.status = 'ACTIVE') AS is_active_tech
+      FROM service_requests r WHERE r.id = ${requestId}::uuid`;
+    const row = rows[0];
+    if (!row) return false;
+    if (user.role === 'ADMIN') return true;
+    if (user.role === 'REQUESTER') return row.requester_id === user.id;
+    return user.role === 'TECHNICIAN' && row.is_active_tech;
+  }
+
   async assertView(db: Db, user: Pick<AuthUser, 'id' | 'role'>, requestId: string): Promise<void> {
     if (!(await this.canView(db, user, requestId))) throw new AppException('NOT_FOUND');
   }

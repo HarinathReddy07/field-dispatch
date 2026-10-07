@@ -105,20 +105,27 @@ export class AuthService {
 
   /** Verifies an access token and loads the CURRENT role/status from the database (never from the token). */
   async authenticate(token: string): Promise<AuthUser> {
+    return (await this.verifyToken(token)).user;
+  }
+
+  /** Same as authenticate, plus the token expiry (epoch seconds) so long-lived sockets can be cut off. */
+  async verifyToken(token: string): Promise<{ user: AuthUser; exp: number }> {
     let sub: string;
+    let exp: number;
     try {
-      const payload = await this.jwt.verifyAsync<{ sub?: string }>(token, {
+      const payload = await this.jwt.verifyAsync<{ sub?: string; exp?: number }>(token, {
         secret: this.cfg.JWT_ACCESS_SECRET,
         algorithms: ['HS256'],
       });
-      if (!payload.sub) throw new Error('no subject');
+      if (!payload.sub || !payload.exp) throw new Error('missing claims');
       sub = payload.sub;
+      exp = payload.exp;
     } catch {
       throw new AppException('UNAUTHENTICATED');
     }
     const user = await this.prisma.user.findUnique({ where: { id: sub } });
     if (!user || user.status !== 'ACTIVE') throw new AppException('UNAUTHENTICATED');
-    return { id: user.id, name: user.name, role: user.role as Role };
+    return { user: { id: user.id, name: user.name, role: user.role as Role }, exp };
   }
 
   private newRefreshToken(): string {

@@ -19,6 +19,7 @@ import { APP_CONFIG } from '../../config/config.module';
 import { AuditService } from '../../infra/audit.service';
 import { PrismaService } from '../../infra/prisma.service';
 import { RedisService } from '../../infra/redis.service';
+import { RealtimeModule } from '../realtime/realtime.module';
 import { REALTIME_PUBLISHER, RealtimePublisher } from '../realtime/realtime.tokens';
 
 @Injectable()
@@ -127,6 +128,7 @@ export class TechniciansController {
 }
 
 @Module({
+  imports: [RealtimeModule],
   controllers: [TechniciansController],
   providers: [TechniciansService],
   exports: [TechniciansService],
