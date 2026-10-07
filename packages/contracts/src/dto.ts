@@ -91,10 +91,25 @@ export type EvidenceIntentResponse = z.infer<typeof EvidenceIntentResponseSchema
 export const EvidenceFinalizeSchema = strict({ mediaId: z.string().uuid() });
 export type EvidenceFinalizeDto = z.infer<typeof EvidenceFinalizeSchema>;
 
-export const ReviewSchema = z.discriminatedUnion('decision', [
-  strict({ decision: z.literal('APPROVE') }),
-  strict({ decision: z.literal('REQUEST_REWORK'), reason: z.string().trim().min(3).max(500) }),
-]);
+export const ReviewSchema = strict({
+  decision: z.enum(['APPROVE', 'REQUEST_REWORK']),
+  reason: z.string().trim().min(3).max(500).optional(),
+}).superRefine((v, ctx) => {
+  if (v.decision === 'REQUEST_REWORK' && !v.reason) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['reason'],
+      message: 'reason is required to request rework',
+    });
+  }
+  if (v.decision === 'APPROVE' && v.reason !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['reason'],
+      message: 'reason is only allowed with REQUEST_REWORK',
+    });
+  }
+});
 export type ReviewDto = z.infer<typeof ReviewSchema>;
 
 export const AvailabilityUpdateSchema = strict({ status: z.enum(['AVAILABLE', 'OFFLINE']) });

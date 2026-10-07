@@ -38,6 +38,8 @@ export const EnvSchema = z.object({
   S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().positive().default(300),
   STORAGE_PROVIDER: z.enum(['minio', 'memory']).default('minio'),
   SWAGGER_ENABLED: bool.default('true'),
+  /** Outbox publisher + review sweeper. Tests may disable and drive them manually. */
+  BACKGROUND_JOBS: bool.default('true'),
 });
 export type Env = z.infer<typeof EnvSchema>;
 
