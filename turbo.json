@@ -1,5 +1,13 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": [
+    "TEST_ADMIN_DATABASE_URL",
+    "TEST_REDIS_URL",
+    "DOCKER_HOST",
+    "TESTCONTAINERS_HOST_OVERRIDE",
+    "TESTCONTAINERS_RYUK_DISABLED",
+    "CONCURRENCY_ITERATIONS"
+  ],
   "tasks": {
     "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**"] },
     "lint": { "dependsOn": ["^build"] },

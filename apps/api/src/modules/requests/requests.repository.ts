@@ -12,14 +12,14 @@ import { Db } from '../../infra/prisma.service';
 import { REQUEST_COLS, RequestRow } from '../../infra/request-sql';
 
 type ViewRow = RequestRow & {
-  technician: { id: string; name: string; rating: number } | null;
+  technician: { id: string; name: string; rating: number; assignment_id: string } | null;
   settlement: { amount_minor: number; status: SettlementStatus; provider_ref: string } | null;
 };
 
 const VIEW_SELECT = Prisma.sql`
   ${REQUEST_COLS},
   (SELECT row_to_json(x) FROM (
-     SELECT u.id::text AS id, u.name, u.rating::float8 AS rating
+     SELECT u.id::text AS id, u.name, u.rating::float8 AS rating, a.id::text AS assignment_id
      FROM assignments a JOIN users u ON u.id = a.technician_id
      WHERE a.request_id = r.id
      ORDER BY (a.status = 'ACTIVE') DESC, a.confirmed_at DESC LIMIT 1) x) AS technician,
@@ -42,7 +42,14 @@ export function toView(row: ViewRow): RequestView {
     startedAt: row.started_at?.toISOString() ?? null,
     reviewDeadlineAt: row.review_deadline_at?.toISOString() ?? null,
     updatedAt: row.updated_at.toISOString(),
-    technician: row.technician,
+    technician: row.technician
+      ? {
+          id: row.technician.id,
+          name: row.technician.name,
+          rating: row.technician.rating,
+          assignmentId: row.technician.assignment_id,
+        }
+      : null,
     settlement: row.settlement
       ? {
           amountMinor: row.settlement.amount_minor,

@@ -17,7 +17,7 @@ The author's machine had **no Docker**. Therefore:
 - `docker compose up`, the Dockerfiles, the `migrate`/`seed` services and the `make` targets were written but **never executed here**. Treat the first `make up` on a Docker host as the first real run (CI uses service containers for the same database/Redis images).
 - The **MinIO adapter** (`modules/jobs/storage/minio.storage.ts`) has never talked to a real MinIO. Presigned PUT signs `Content-Type` and `Content-Length`; if a MinIO version rejects that combination, adjust `signableHeaders` there. Tests use the in-memory mock, which models URL expiry and signatures.
 - Container-level restart (A7) was not executed; the in-process restart test covers the same guarantees (state in Postgres, OTP in Postgres, tokens stateless, sweeper resumes).
-- The **mobile app has not been run on a device or emulator** in this environment. It is type-checked, its logic/client/component tests run, and the Android bundle step is verified separately (see PROGRESS.md for the exact result). Screens, camera, secure storage and socket behaviour on real hardware are untested.
+- The **mobile app has not been run on a device or emulator** in this environment. It is type-checked, its logic/API-client/evidence-pipeline/component tests pass (44), and the Android Hermes bundle builds under Metro (all imports, including the shared contracts, resolve). Camera, secure storage, Socket.io on hardware and the Expo runtime are untested.
 - No load/performance run (k6/autocannon) and no `EXPLAIN ANALYZE` evidence for the nearby query were recorded.
 
 ## Technical limitations

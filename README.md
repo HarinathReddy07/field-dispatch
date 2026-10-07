@@ -76,15 +76,17 @@ Seeded 12 users (8 technicians). Demo password: see README.
 Seeded 12 users (8 technicians). Demo password: see README.
 $ curl -s http://127.0.0.1:3000/health/ready
 {"status":"ok","checks":{"database":true,"redis":true}}
-$ cd apps/api && npx jest --config jest.config.js
-Test Suites: 15 passed, 15 total
-Tests:       142 passed, 142 total
-$ pnpm --filter @dispatch/contracts test
-Tests:       776 passed, 776 total
-$ cd apps/admin && npx playwright test        # against the running API + admin
+$ pnpm test                                   # whole monorepo
+  admin 7 · contracts 776 · mobile 44 · api 142 (15 suites)        all pass
+$ pnpm --filter @dispatch/api test:e2e         # make e2e: A1-A7 + realtime
+Test Suites: 8 passed, 8 total
+Tests:       78 passed, 78 total
+$ cd apps/admin && npx playwright test         # against the running API + admin
   ok 1 only admins can sign in; protected pages redirect to login
   ok 2 live board: a new job and its transitions appear without reloading; cancel needs a reason and is audited
   2 passed
+$ cd apps/mobile && npx expo export --platform android
+Android Bundled (958 modules)  ->  index-….hbc (2.4MB)
 ```
 
 Counts are refreshed in [`PROGRESS.md`](PROGRESS.md) after each slice.

@@ -10,3 +10,4 @@ coverage
 .expo
 test-results
 playwright-report
+dist-bundle

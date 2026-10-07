@@ -63,7 +63,16 @@ Each integration suite creates its own migrated, seeded database, so suites are 
 | Unauthorized socket room join          | `realtime.int`                                                                   | `{ok:false, NOT_FOUND}`, no events                                     |
 | Append-only history                    | `migrations.int`                                                                 | UPDATE/DELETE/TRUNCATE blocked                                         |
 
-## Results (last full run on the author's machine, no Docker; PostgreSQL 16.4 + PostGIS 3.6, Redis 5)
+## Results (last full run on the author's machine: no Docker; PostgreSQL 16.4 + PostGIS 3.6, Redis 5)
+
+| Suite                                                                      | Result                                                                     |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `pnpm lint`, `pnpm typecheck`                                              | clean                                                                      |
+| `pnpm test`                                                                | admin 7 · contracts 776 · mobile 44 · API 142 tests in 15 suites: all pass |
+| `make e2e` (A1-A7 + realtime)                                              | 8 suites / 78 tests pass                                                   |
+| coverage (`test:cov`)                                                      | domain 100 %, dispatch 98.4 % lines (gate 90 %)                            |
+| admin Playwright smoke (against a locally running API + admin + seeded DB) | 2 passed                                                                   |
+| `expo export --platform android`                                           | Hermes bundle builds                                                       |
 
 Recorded in [`PROGRESS.md`](../PROGRESS.md) after each slice. The CI workflow runs the same suites with `postgis/postgis:16-3.4` and `redis:7` service containers.
 

@@ -172,7 +172,9 @@ export const RequestViewSchema = z.object({
   startedAt: z.string().nullable(),
   reviewDeadlineAt: z.string().nullable(),
   updatedAt: z.string(),
-  technician: z.object({ id: z.string().uuid(), name: z.string(), rating: z.number() }).nullable(),
+  technician: z
+    .object({ id: z.string().uuid(), name: z.string(), rating: z.number(), assignmentId: z.string().uuid() })
+    .nullable(),
   settlement: z
     .object({ amountMinor: z.number().int(), status: SettlementStatusSchema, providerRef: z.string() })
     .nullable(),

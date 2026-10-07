@@ -1,59 +1,70 @@
 # PROGRESS
 
-Memory file (BUILD_SPEC §0). Last verified: API suite `npx jest` in `apps/api` = **15 suites / 142 tests pass**; contracts = **776 pass**; `pnpm lint`, `pnpm typecheck` clean. Verified against a real PostgreSQL 16.4 + PostGIS 3.6 and Redis (local, no Docker available on this machine). **Docker/compose has never been run here** (no Docker installed).
+Memory file (BUILD_SPEC §0). Legend: **DONE** = verified by a test or a command I ran · **PARTIAL** · **MISSING**.
 
-Legend: DONE = test-verified · PARTIAL · MISSING.
+## Last verification (this session)
+
+Environment: Windows, **no Docker**; local PostgreSQL 16.4 + PostGIS 3.6 and Redis 5 (`TEST_ADMIN_DATABASE_URL`, `TEST_REDIS_URL`).
+
+| Suite                       | Command                                                                   | Result                                                               |
+| --------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Lint, typecheck             | `pnpm lint` / `pnpm typecheck`                                            | 7 / 8 packages clean                                                 |
+| Everything                  | `pnpm test`                                                               | admin 7 · contracts 776 · mobile 44 · API 142 (15 suites) — all pass |
+| Acceptance A1-A7 + realtime | `pnpm --filter @dispatch/api test:e2e` (`make e2e`)                       | 8 suites / 78 tests pass                                             |
+| Coverage gate               | `pnpm --filter @dispatch/api test:cov`                                    | domain 100 %, dispatch 98.4 % lines (gate 90 %)                      |
+| Admin smoke (real stack)    | `npx playwright test` in `apps/admin` against locally running API + admin | 2 passed                                                             |
+| Mobile bundle               | `npx expo export --platform android`                                      | Hermes bundle builds (958 modules)                                   |
+| Dependency audit            | `pnpm audit --prod`                                                       | 3 moderate left (Nest 10 transitives); highs fixed via overrides     |
 
 ## §3 Functional
 
-| ID                    | Status             | Where / evidence                                                                         |
-| --------------------- | ------------------ | ---------------------------------------------------------------------------------------- |
-| TR-01 auth            | DONE               | `modules/auth`, `test/integration/auth.int.spec.ts`, `security.int.spec.ts`              |
-| TR-02 request         | DONE               | `requests.service.ts` (create, PATCH edit), `dispatch.int`, `lifecycle.int` (edit test)  |
-| TR-03 proximity       | DONE               | `dispatch.service.ts` `findCandidates`, `dispatch.int`                                   |
-| TR-04 atomic confirm  | DONE               | `dispatch.service.ts`, `concurrency.int` (20x loops)                                     |
-| TR-05 dispatch push   | DONE               | `outbox.publisher.ts`, `realtime.gateway.ts`, `realtime.int`                             |
-| TR-06 OTP             | DONE               | `otp.service.ts`, `otp.int`                                                              |
-| TR-07 timer           | DONE (server side) | `started_at` DB clock in `jobs.service.ts`; client timer lives in mobile/admin (MISSING) |
-| TR-08 proof gate      | DONE               | `jobs.service.ts` stop, `lifecycle.int`                                                  |
-| TR-09 review/rework   | DONE               | `jobs.service.ts`, `lifecycle.int` (A2)                                                  |
-| TR-10 auto-approve    | DONE               | `sweeper.service.ts`, `settlement.int`, `restart.int`                                    |
-| TR-11 settlement      | DONE               | `settlement.service.ts`, `settlement.int`                                                |
-| TR-12 audit           | DONE               | `audit.service.ts`, `transition.service.ts`, append-only trigger, `migrations.int`       |
-| TR-13 admin dashboard | PARTIAL            | API done (`modules/admin`, `admin.int`); **web UI MISSING**                              |
-| TR-14 history/reorder | DONE (API)         | `requests.service.ts`, `dispatch.int`; UI MISSING                                        |
+| ID                    | Status | Evidence                                                                                                  |
+| --------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
+| TR-01 auth            | DONE   | `modules/auth`; `auth.int`, `security.int`                                                                |
+| TR-02 request         | DONE   | `requests.service.ts` (create, PATCH edit); `dispatch.int`, `lifecycle.int`; mobile `CreateRequestScreen` |
+| TR-03 proximity       | DONE   | `dispatch.service.ts`; `dispatch.int`                                                                     |
+| TR-04 atomic confirm  | DONE   | `concurrency.int` (20× loops)                                                                             |
+| TR-05 dispatch push   | DONE   | `realtime.int`; admin smoke; mobile `useLiveEvents` (not run on device)                                   |
+| TR-06 OTP             | DONE   | `otp.int` (7)                                                                                             |
+| TR-07 timer           | DONE   | server `started_at`; admin `elapsedSeconds` (unit-tested); mobile `lib/timer.ts` (unit-tested)            |
+| TR-08 proof gate      | DONE   | `lifecycle.int`                                                                                           |
+| TR-09 review/rework   | DONE   | `lifecycle.int` (A2)                                                                                      |
+| TR-10 auto-approve    | DONE   | `settlement.int`, `restart.int`                                                                           |
+| TR-11 settlement      | DONE   | `settlement.int`                                                                                          |
+| TR-12 audit           | DONE   | `migrations.int`, `admin.int`; admin Audit view                                                           |
+| TR-13 admin dashboard | DONE   | `apps/admin`; Playwright smoke                                                                            |
+| TR-14 history/reorder | DONE   | API `dispatch.int`; mobile `HistoryScreen`                                                                |
 
 ## §4 Screens
 
-- Admin web (6 views): **MISSING** (`apps/admin` is empty)
-- Mobile (all screens): **MISSING** (`apps/mobile` is empty)
+- **Admin web — DONE** (all six views; Playwright smoke passes on the real stack): dashboard, live board + Leaflet map, job detail, technicians, audit, reason-gated cancel/reassign.
+- **Mobile — PARTIAL.** All screens written for both roles (login, home/jobs, create request, nearby options, booking confirmation, arrival OTP for both roles, active job + server timer, evidence upload with progress/retry, review/rework, history/receipt/reorder). Typecheck, 44 tests and the Android bundle pass. **Not run on a device/emulator**, so "A1/A2 with two live sessions" has not been demonstrated end-to-end on mobile.
 
-## §7 Concurrency — DONE
+## §7 Concurrency — DONE · §8 Security — DONE
 
-Row lock + version-checked UPDATE (`transition.service.ts`), partial unique indexes + exclusion constraint (`0002_core.sql`), atomic OTP consume, Idempotency-Key via `idempotency.service.ts`. Tests: `concurrency.int`, `otp.int`, `settlement.int`, `migrations.int`.
+Tests: `concurrency.int`, `otp.int`, `settlement.int`, `migrations.int`; `security.int`, `media.int`, `admin.int`, `logging.int`, `realtime.int`. Gaps: HTTPS/WSS is a deployment concern (documented); CodeQL/dependency-review run in CI only.
 
-## §8 Security — DONE (matrix tests in `security.int`, `otp.int`, `media.int`, `admin.int`, `logging.int`, `realtime.int`)
+## §9 Events / API — DONE
 
-Remaining gaps: `pnpm audit`/CodeQL not run; HTTPS/WSS only documented, not shipped (no proxy config).
-
-## §9 Events / API
-
-- 8 socket events: DONE (`realtime.int`). REST list: DONE incl. extras (`/requests/active`, `/requests/:id/snapshot`, `/requests/:id/cancel`, `/requests/:id/evidence`, `/admin/summary`, `/technicians/me/*`).
-- Tests: unit DONE · integration DONE · concurrency DONE · realtime DONE · security DONE.
-- A1 DONE `lifecycle.int` · A2 DONE · A3 DONE `otp.int` · A4 DONE `concurrency.int` · A5 DONE `admin.int`+`security.int` · A6 DONE `settlement.int` · A7 DONE in-process restart (`restart.int`); **container kill/restart variant not run (no Docker)**.
+8 socket events, REST list (plus extras) documented in `docs/api.md`. A1-A7: all have automated tests (A7 = in-process restart; container restart not executed).
 
 ## §10 Phases
 
-1. Infra — **PARTIAL**: migrations, seed, `.env.example`, compose file written; **api/admin Dockerfiles MISSING**, compose never run, `make e2e` has no e2e dir, CI workflow MISSING.
-2. API core — DONE. 3. API job flow — DONE. 4. Realtime — DONE.
-3. Admin web — MISSING. 6. Mobile — MISSING. 7. Security matrix — DONE (see §8 gaps).
-4. Docs — MISSING: README, `docs/architecture.md`, `api.md`, `test-plan.md`, `runbook.md`, `demo-script.md`, ADRs, known-limitations.
+1. Infra — **PARTIAL**: compose, Dockerfiles (api, admin), auto-migrate + seed services, Makefile, CI workflows written. **Never executed (no Docker here).**
+2. API core — DONE · 3. API job flow — DONE · 4. Realtime — DONE
+3. Admin web — DONE · 6. Mobile — PARTIAL (see above) · 7. Security matrix — DONE
+4. Docs — DONE (README, architecture, api, test-plan, runbook, demo-script, known-limitations, ADR 0001-0006).
 
-## Next (in order)
+## Blockers / honest gaps
 
-1. Dockerfiles + CI + `test:e2e` wiring + coverage gate.
-2. Admin web. 3. Mobile. 4. Docs/README. 5. Re-run everything, update this file.
+- **No Docker on the dev machine:** `make up`, the images, compose healthchecks, Testcontainers path and the MinIO adapter have never run. First run on a Docker host is the real test (CI mirrors it with service containers).
+- **Mobile never executed on a device/emulator** (camera, secure store, socket on hardware, Expo runtime).
+- **No performance evidence** (no k6/`EXPLAIN ANALYZE` recorded).
+- 3 moderate dependency advisories (NestJS 10 transitives).
 
-## Blockers
+## Next, if time allows
 
-- No Docker on this machine: compose, Testcontainers path, MinIO adapter (`minio.storage.ts`) and container restart cannot be executed here. Tests run against locally installed PostGIS/Redis via `TEST_ADMIN_DATABASE_URL` / `TEST_REDIS_URL`; the MinIO adapter is untested (memory mock is used in tests).
+1. Run `make up && make seed && make e2e` on a Docker host; fix whatever the first container run reveals.
+2. Run the mobile app on an emulator against the compose stack; walk `docs/demo-script.md` end to end.
+3. Record `EXPLAIN ANALYZE` for the nearby query and a short load run in `docs/test-plan.md`.
+4. Tag `v0.1.0-trial` after (1)-(2).
