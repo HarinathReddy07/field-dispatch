@@ -43,7 +43,7 @@ export class OtpService {
     return this.prisma.tx(async (tx) => {
       const req = await lockRequest(tx, requestId);
       if (!req || req.requester_id !== user.id) throw new AppException('NOT_FOUND');
-      if (req.state !== 'ASSIGNED')
+      if (req.state !== 'CONFIRMED')
         throw new AppException('STATE_CONFLICT', 'An arrival code can only be issued for an assigned job');
       const active = await this.assignments.activeTechnician(tx, requestId);
       if (!active) throw new AppException('STATE_CONFLICT');
@@ -96,7 +96,7 @@ export class OtpService {
     const req = await lockRequest(tx, requestId);
     if (!req || !(await this.assignments.isActiveAssignee(tx, requestId, user.id)))
       throw new AppException('NOT_FOUND');
-    if (req.state !== 'ASSIGNED') {
+    if (req.state !== 'CONFIRMED') {
       // Also covers replay of an already-consumed code once the job has moved on.
       throw new AppException(
         'ILLEGAL_TRANSITION',

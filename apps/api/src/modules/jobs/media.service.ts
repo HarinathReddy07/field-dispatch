@@ -64,7 +64,7 @@ export class MediaService {
       const req = await lockRequest(tx, requestId);
       if (!req || !(await this.assignments.isActiveAssignee(tx, requestId, user.id)))
         throw new AppException('NOT_FOUND');
-      if (req.state !== 'IN_PROGRESS')
+      if (req.state !== 'IN_PROGRESS' && req.state !== 'REWORK')
         throw new AppException('STATE_CONFLICT', 'Evidence can only be added while work is in progress');
       const count = await tx.$queryRaw<{ n: number }[]>`
         SELECT count(*)::int AS n FROM evidence_media WHERE request_id = ${requestId}::uuid AND work_cycle = ${req.work_cycle}::int`;
@@ -119,7 +119,7 @@ export class MediaService {
             throw new AppException('NOT_FOUND');
           const current = await this.loadOwnedMedia(tx, user, requestId, mediaId);
           if (current.status === 'PENDING') {
-            if (req.state !== 'IN_PROGRESS')
+            if (req.state !== 'IN_PROGRESS' && req.state !== 'REWORK')
               throw new AppException(
                 'STATE_CONFLICT',
                 'Evidence can only be finalized while work is in progress',

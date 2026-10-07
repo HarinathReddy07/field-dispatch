@@ -17,13 +17,15 @@ import { MediaService } from '../jobs/media.service';
 import { RequestsRepository } from '../requests/requests.repository';
 
 const ACTIVE_STATES: RequestState[] = [
-  'CREATED',
-  'MATCHING',
-  'ASSIGNED',
+  'DRAFT',
+  'REQUESTED',
+  'MATCHED',
+  'CONFIRMED',
   'ARRIVED',
   'IN_PROGRESS',
+  'PROOF_UPLOADED',
   'UNDER_REVIEW',
-  'REWORK_REQUESTED',
+  'REWORK',
 ];
 
 interface LiveRow {
@@ -247,7 +249,7 @@ export class AdminService {
       Prisma.sql`started_at = NULL`,
       Prisma.sql`review_deadline_at = NULL`,
     ];
-    if (req.state === 'IN_PROGRESS' || req.state === 'REWORK_REQUESTED')
+    if (req.state === 'IN_PROGRESS' || req.state === 'REWORK')
       set.push(Prisma.sql`work_cycle = work_cycle + 1`);
     await this.transitions.apply(tx, {
       requestId,

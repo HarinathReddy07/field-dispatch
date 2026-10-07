@@ -56,13 +56,13 @@ export class DispatchService {
     return this.prisma.tx(async (tx) => {
       const req = await lockRequest(tx, requestId);
       if (!req || req.requester_id !== user.id) throw new AppException('NOT_FOUND');
-      if (req.state !== 'CREATED' && req.state !== 'MATCHING') {
+      if (req.state !== 'REQUESTED' && req.state !== 'MATCHED') {
         throw new AppException(
           'STATE_CONFLICT',
           'Technicians can only be searched before a booking is confirmed',
         );
       }
-      if (req.state === 'CREATED') {
+      if (req.state === 'REQUESTED') {
         await this.transitions.apply(tx, {
           requestId,
           action: 'SEARCH',
@@ -139,8 +139,13 @@ export class DispatchService {
   ): Promise<RequestView> {
     const req = await lockRequest(tx, requestId); // 1) request row
     if (!req || req.requester_id !== user.id) throw new AppException('NOT_FOUND');
-    if (req.state !== 'CREATED' && req.state !== 'MATCHING') {
-      throw new AppException('STATE_CONFLICT', 'This request has already been confirmed or closed');
+    if (req.state !== 'MATCHED') {
+      throw new AppException(
+        'STATE_CONFLICT',
+        req.state === 'REQUESTED'
+          ? 'Search for nearby technicians before confirming'
+          : 'This request has already been confirmed or closed',
+      );
     }
 
     // 2) technician row. Eligibility is re-checked under the lock; the search result may be stale.

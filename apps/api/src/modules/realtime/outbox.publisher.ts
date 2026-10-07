@@ -76,7 +76,7 @@ export class OutboxPublisher implements OnApplicationBootstrap, OnModuleDestroy 
       });
       for (const r of published) {
         const to = (r.payload as { to?: string }).to;
-        const terminal = r.type === 'request.state.changed' && (to === 'COMPLETED' || to === 'CANCELLED');
+        const terminal = r.type === 'request.state.changed' && (to === 'SETTLED' || to === 'CANCELLED');
         if (r.request_id && (r.type === 'admin.override' || r.type === 'assignment.created' || terminal)) {
           await this.gateway.revalidateRequestRoom(r.request_id);
         }

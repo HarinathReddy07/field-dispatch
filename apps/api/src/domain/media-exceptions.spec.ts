@@ -42,7 +42,7 @@ describe('exception flags', () => {
     expect(computeExceptionFlags({ ...base, technicianLastSeenAt: null })).toEqual(['TECHNICIAN_STALE']);
   });
   it('flags requests without a technician after 5 minutes', () => {
-    const old = { ...base, state: 'MATCHING' as const, createdAt: new Date('2030-01-01T11:50:00Z') };
+    const old = { ...base, state: 'MATCHED' as const, createdAt: new Date('2030-01-01T11:50:00Z') };
     expect(computeExceptionFlags(old)).toEqual(['NO_TECHNICIAN']);
     expect(computeExceptionFlags({ ...old, createdAt: new Date('2030-01-01T11:58:00Z') })).toEqual([]);
   });
@@ -56,10 +56,10 @@ describe('exception flags', () => {
     ]);
   });
   it('flags open and repeated rework; terminal states are never flagged', () => {
-    expect(computeExceptionFlags({ ...base, state: 'REWORK_REQUESTED', workCycle: 3 })).toEqual([
+    expect(computeExceptionFlags({ ...base, state: 'REWORK', workCycle: 3 })).toEqual([
       'REWORK_OPEN',
       'MULTIPLE_REWORKS',
     ]);
-    expect(computeExceptionFlags({ ...base, state: 'COMPLETED', workCycle: 4 })).toEqual([]);
+    expect(computeExceptionFlags({ ...base, state: 'SETTLED', workCycle: 4 })).toEqual([]);
   });
 });

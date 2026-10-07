@@ -1,10 +1,11 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
 import { AuthUser, CurrentUser, IdempotencyKey, Roles } from '../../common/decorators';
 import {
   ConfirmBody,
   CreateRequestBody,
   HistoryQueryDto,
+  UpdateRequestBody,
   NearbyQueryDto,
   SnapshotQueryDto,
 } from '../../common/dtos';
@@ -24,6 +25,16 @@ export class RequestsController {
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() body: CreateRequestBody) {
     return this.requests.create(user, body);
+  }
+
+  @Roles('REQUESTER')
+  @Patch(':id')
+  update(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateRequestBody,
+  ) {
+    return this.requests.update(user, id, body);
   }
 
   // Static routes are declared before ':id' so they are never captured by the param route.

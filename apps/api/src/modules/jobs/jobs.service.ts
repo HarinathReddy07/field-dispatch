@@ -57,28 +57,28 @@ export class JobsService {
     return row;
   }
 
-  /** ARRIVED -> IN_PROGRESS, or REWORK_REQUESTED -> IN_PROGRESS (new work cycle). Start time is the DB clock. */
+  /** ARRIVED -> IN_PROGRESS. The start time is the database clock, never the client's. */
   start(user: AuthUser, requestId: string, key: string): Promise<RequestView> {
     return this.run(user, '/requests/:id/start', requestId, key, {}, async (tx) => {
-      const row = await this.lockForTechnician(tx, user, requestId);
-      const restart = row.state === 'REWORK_REQUESTED';
-      const set = [Prisma.sql`started_at = now()`, Prisma.sql`review_deadline_at = NULL`];
-      if (restart) set.push(Prisma.sql`work_cycle = work_cycle + 1`);
+      await this.lockForTechnician(tx, user, requestId);
       await this.transitions.apply(tx, {
         requestId,
-        action: restart ? 'RESTART_WORK' : 'START',
+        action: 'START',
         actor: { id: user.id, role: 'TECHNICIAN' },
-        set,
+        set: [Prisma.sql`started_at = now()`, Prisma.sql`review_deadline_at = NULL`],
       });
       return (await this.repo.getView(tx, requestId))!;
     });
   }
 
-  /** IN_PROGRESS -> UNDER_REVIEW, gated on >= 2 finalized images in the CURRENT work cycle. */
+  /**
+   * IN_PROGRESS | REWORK -> PROOF_UPLOADED -> UNDER_REVIEW, gated on >= 2 finalized images in the
+   * CURRENT work cycle (a rework request opens a new cycle, so earlier proofs never count).
+   */
   stop(user: AuthUser, requestId: string, key: string): Promise<RequestView> {
     return this.run(user, '/requests/:id/stop', requestId, key, {}, async (tx) => {
       const row = await this.lockForTechnician(tx, user, requestId);
-      if (row.state === 'IN_PROGRESS') {
+      if (row.state === 'IN_PROGRESS' || row.state === 'REWORK') {
         const counted = await tx.$queryRaw<{ n: number }[]>`
           SELECT count(*)::int AS n FROM evidence_media
           WHERE request_id = ${requestId}::uuid AND work_cycle = ${row.work_cycle}::int AND status = 'FINALIZED'`;
@@ -94,6 +94,13 @@ export class JobsService {
         requestId,
         action: 'STOP',
         actor: { id: user.id, role: 'TECHNICIAN' },
+        metadata: { workCycle: row.work_cycle },
+      });
+      await this.transitions.apply(tx, {
+        requestId,
+        action: 'SUBMIT_REVIEW',
+        actor: { id: user.id, role: 'TECHNICIAN' },
+        // The review deadline is persisted; the sweeper (not a process timer) enforces it.
         set: [
           Prisma.sql`review_deadline_at = now() + make_interval(secs => ${this.cfg.REVIEW_TIMEOUT_SECONDS}::float8)`,
         ],
@@ -117,7 +124,9 @@ export class JobsService {
         action: 'REQUEST_REWORK',
         actor: { id: user.id, role: 'REQUESTER' },
         reason: dto.reason,
-        metadata: { workCycle: row.work_cycle },
+        // A rework opens a NEW work cycle: its proofs are counted separately and earlier ones are kept.
+        set: [Prisma.sql`work_cycle = work_cycle + 1`, Prisma.sql`review_deadline_at = NULL`],
+        metadata: { workCycle: row.work_cycle, nextWorkCycle: row.work_cycle + 1 },
       });
       const audience = [
         rooms.admin,
@@ -128,7 +137,7 @@ export class JobsService {
       await this.outbox.enqueue(tx, 'review.requested', requestId, audience, {
         requestId,
         reason: dto.reason!,
-        workCycle: row.work_cycle,
+        workCycle: row.work_cycle + 1,
       });
       return (await this.repo.getView(tx, requestId))!;
     });
@@ -158,19 +167,36 @@ export class JobsService {
       amountMinor: outcome.before.quote_minor!, // server-held quote
       actor: { id: actor.id, role: actor.role === 'SYSTEM' ? 'SYSTEM' : 'REQUESTER' },
     });
+    // COMPLETED -> SETTLED in the same transaction: the mock ledger row exists, so the job is settled.
+    await this.transitions.apply(tx, {
+      requestId,
+      action: 'SETTLE',
+      actor: { id: null, role: 'SYSTEM' },
+      metadata: { amountMinor: outcome.before.quote_minor },
+    });
     return (await this.repo.getView(tx, requestId))!;
   }
 
-  /** Requester cancels before work starts. */
+  /**
+   * Requester cancel. With a technician booked (CONFIRMED) the booking is released and the request
+   * returns to REQUESTED; before that the request is cancelled outright.
+   */
   cancel(user: AuthUser, requestId: string, key: string): Promise<RequestView> {
     return this.run(user, '/requests/:id/cancel', requestId, key, {}, async (tx) => {
       const row = await lockRequest(tx, requestId);
       if (!row || row.requester_id !== user.id) throw new AppException('NOT_FOUND');
+      const releasing = row.state === 'CONFIRMED';
       await this.transitions.apply(tx, {
         requestId,
-        action: 'CANCEL',
+        action: releasing ? 'CANCEL_ASSIGNMENT' : 'CANCEL',
         actor: { id: user.id, role: 'REQUESTER' },
+        set: releasing ? [Prisma.sql`quote_minor = NULL`] : [],
       });
+      if (releasing) {
+        await tx.$executeRaw`
+          UPDATE otp_challenges SET superseded_at = now()
+          WHERE request_id = ${requestId}::uuid AND consumed_at IS NULL AND superseded_at IS NULL`;
+      }
       await this.assignments.endActive(tx, requestId, 'CANCELLED', 'cancelled by requester');
       await this.audit.record(tx, {
         actorId: user.id,

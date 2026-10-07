@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { CreateRequestDto, RequestView, rooms } from '@dispatch/contracts';
+import { CreateRequestDto, RequestView, UpdateRequestDto, rooms } from '@dispatch/contracts';
 import { AppException } from '../../common/app-exception';
 import { AuthUser } from '../../common/decorators';
 import { AuditService } from '../../infra/audit.service';
 import { OutboxService } from '../../infra/outbox.service';
 import { PrismaService, Tx } from '../../infra/prisma.service';
+import { lockRequest } from '../../infra/request-sql';
+import { TransitionService } from '../../infra/transition.service';
 import { AccessService } from './access.service';
 import { RequestsRepository } from './requests.repository';
 
@@ -20,6 +22,7 @@ export class RequestsService {
     private readonly access: AccessService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly transitions: TransitionService,
   ) {}
 
   private validateWindow(startIso: string, endIso: string): void {
@@ -32,7 +35,7 @@ export class RequestsService {
       throw new AppException('VALIDATION_FAILED', 'The time window cannot exceed 24 hours');
   }
 
-  /** Inserts the request plus its CREATED job_event, audit row and outbox event in the caller's transaction. */
+  /** Inserts a DRAFT, then submits it (DRAFT -> REQUESTED) with its events, audit rows and outbox event, in the caller's transaction. */
   private async createIn(
     tx: Tx,
     user: AuthUser,
@@ -42,7 +45,7 @@ export class RequestsService {
     const id = await this.repo.insert(tx, user.id, dto, reorderOf);
     await tx.$executeRaw`
       INSERT INTO job_events (request_id, state_from, state_to, action, actor_id, actor_role, metadata)
-      VALUES (${id}::uuid, NULL, 'CREATED', 'CREATE', ${user.id}::uuid, 'REQUESTER', ${JSON.stringify(reorderOf ? { reorderOf } : {})}::jsonb)`;
+      VALUES (${id}::uuid, NULL, 'DRAFT', 'CREATE', ${user.id}::uuid, 'REQUESTER', ${JSON.stringify(reorderOf ? { reorderOf } : {})}::jsonb)`;
     await this.audit.record(tx, {
       actorId: user.id,
       actorRole: 'REQUESTER',
@@ -52,10 +55,15 @@ export class RequestsService {
       requestId: id,
       metadata: { category: dto.category, ...(reorderOf ? { reorderOf } : {}) },
     });
+    await this.transitions.apply(tx, {
+      requestId: id,
+      action: 'SUBMIT',
+      actor: { id: user.id, role: 'REQUESTER' },
+    });
     await this.outbox.enqueue(tx, 'request.created', id, [rooms.admin, rooms.user(user.id)], {
       requestId: id,
       category: dto.category,
-      state: 'CREATED',
+      state: 'REQUESTED',
     });
     return id;
   }
@@ -64,6 +72,25 @@ export class RequestsService {
     this.validateWindow(dto.windowStart, dto.windowEnd);
     return this.prisma.tx(async (tx) => {
       const id = await this.createIn(tx, user, dto, null);
+      return (await this.repo.getView(tx, id))!;
+    });
+  }
+
+  /** Edit before a technician is matched: REQUESTED -> DRAFT -> REQUESTED, with both transitions recorded. */
+  async update(user: AuthUser, id: string, dto: UpdateRequestDto): Promise<RequestView> {
+    if (dto.windowStart && dto.windowEnd) this.validateWindow(dto.windowStart, dto.windowEnd);
+    return this.prisma.tx(async (tx) => {
+      const row = await lockRequest(tx, id);
+      if (!row || row.requester_id !== user.id) throw new AppException('NOT_FOUND');
+      const actor = { id: user.id, role: 'REQUESTER' as const };
+      await this.transitions.apply(tx, {
+        requestId: id,
+        action: 'EDIT',
+        actor,
+        metadata: { fields: Object.keys(dto) },
+      });
+      await this.repo.updateFields(tx, id, dto);
+      await this.transitions.apply(tx, { requestId: id, action: 'SUBMIT', actor });
       return (await this.repo.getView(tx, id))!;
     });
   }
@@ -81,7 +108,7 @@ export class RequestsService {
 
   /** Completed / cancelled requests for the caller (requester: own; technician: ones they worked). */
   history(user: AuthUser, page: number): Promise<RequestView[]> {
-    const where = Prisma.sql`${this.participantFilter(user)} AND r.state IN ('COMPLETED', 'CANCELLED')`;
+    const where = Prisma.sql`${this.participantFilter(user)} AND r.state IN ('COMPLETED', 'SETTLED', 'CANCELLED')`;
     return this.repo.listViews(this.prisma, where, PAGE_SIZE, (page - 1) * PAGE_SIZE);
   }
 
@@ -90,8 +117,8 @@ export class RequestsService {
     const where =
       user.role === 'TECHNICIAN'
         ? Prisma.sql`EXISTS (SELECT 1 FROM assignments a WHERE a.request_id = r.id AND a.technician_id = ${user.id}::uuid AND a.status = 'ACTIVE')
-                     AND r.state NOT IN ('COMPLETED', 'CANCELLED')`
-        : Prisma.sql`r.requester_id = ${user.id}::uuid AND r.state NOT IN ('COMPLETED', 'CANCELLED')`;
+                     AND r.state NOT IN ('COMPLETED', 'SETTLED', 'CANCELLED')`
+        : Prisma.sql`r.requester_id = ${user.id}::uuid AND r.state NOT IN ('COMPLETED', 'SETTLED', 'CANCELLED')`;
     return this.repo.listViews(this.prisma, where, PAGE_SIZE, 0);
   }
 
@@ -100,7 +127,7 @@ export class RequestsService {
     return this.prisma.tx(async (tx) => {
       const prev = await this.repo.getRaw(tx, id);
       if (!prev || prev.requester_id !== user.id) throw new AppException('NOT_FOUND');
-      if (prev.state !== 'COMPLETED' && prev.state !== 'CANCELLED') {
+      if (!['COMPLETED', 'SETTLED', 'CANCELLED'].includes(prev.state)) {
         throw new AppException('STATE_CONFLICT', 'Only finished requests can be reordered');
       }
       const duration = Math.min(prev.window_end.getTime() - prev.window_start.getTime(), MAX_WINDOW_MS);

@@ -70,6 +70,33 @@ export class RequestsRepository {
     return rows[0]!.id;
   }
 
+  /** Partial update of editable fields (only reachable through RequestsService.update, i.e. while REQUESTED). */
+  async updateFields(
+    db: Db,
+    id: string,
+    dto: Partial<
+      Pick<CreateRequestDto, 'assetId' | 'category' | 'location' | 'windowStart' | 'windowEnd' | 'notes'>
+    >,
+  ): Promise<void> {
+    const sets: Prisma.Sql[] = [];
+    if (dto.assetId !== undefined) sets.push(Prisma.sql`asset_id = ${dto.assetId}`);
+    if (dto.category !== undefined) sets.push(Prisma.sql`category = ${dto.category}`);
+    if (dto.notes !== undefined) sets.push(Prisma.sql`notes = ${dto.notes}`);
+    if (dto.location) {
+      sets.push(
+        Prisma.sql`location = ST_SetSRID(ST_MakePoint(${dto.location.lon}::float8, ${dto.location.lat}::float8), 4326)::geography`,
+      );
+    }
+    if (dto.windowStart && dto.windowEnd) {
+      sets.push(Prisma.sql`window_start = ${dto.windowStart}::timestamptz`);
+      sets.push(Prisma.sql`window_end = ${dto.windowEnd}::timestamptz`);
+    }
+    if (sets.length === 0) return;
+    await db.$executeRaw(
+      Prisma.sql`UPDATE service_requests SET ${Prisma.join(sets, ', ')} WHERE id = ${id}::uuid`,
+    );
+  }
+
   async getView(db: Db, id: string): Promise<RequestView | null> {
     const rows = await db.$queryRaw<ViewRow[]>(
       Prisma.sql`SELECT ${VIEW_SELECT} FROM service_requests r WHERE r.id = ${id}::uuid`,
