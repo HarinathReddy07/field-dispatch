@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
 'use strict';
 /**
  * Provides a real PostgreSQL/PostGIS and Redis for integration tests.

@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
 import { randomBytes } from 'node:crypto';
 import { Client } from 'pg';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { migrate } = require('../../../../infra/scripts/migrate.js') as {
   migrate: (url: string) => Promise<string[]>;
 };
