@@ -1,0 +1,1 @@
+pnpm exec prettier --check . --log-level warn || (echo "Run: pnpm format" && exit 1)
