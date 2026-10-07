@@ -1,6 +1,6 @@
 # Field Asset Inspection & Repair Dispatch: project rules
 
-Paid freelance vendor trial. The client will clone the repo, start the stack from scratch, and judge architecture, real-time correctness, security, concurrency safety, testing and delivery discipline. Requirements live in docs/spec/SPEC.md (the original Task_Project.docx is beside it for the figures). If code and spec disagree, the spec wins. If the spec is ambiguous, write the assumption in docs/architecture.md and continue.
+Paid freelance vendor trial. The client will clone the repo, start the stack from scratch, and judge architecture, real-time correctness, security, concurrency safety, testing and delivery discipline. Requirements live in docs/spec/SPEC.md (the original Task_Project.docx is beside it for the figures). If code and spec disagree, the spec wins. The condensed, authoritative requirement is `BUILD_SPEC.md`; `PROGRESS.md` is the status memory (read both first). If the spec is ambiguous, write the assumption in docs/architecture.md and continue.
 
 ## Stack (do not substitute)
 
@@ -23,7 +23,7 @@ make up | make migrate | make seed | make test | make e2e | make demo | pnpm lin
 ## Non-negotiable rules
 
 1. Server authority: role, state, price, timestamps and timers are decided by the backend. Never trust client role/state/clock/amount.
-2. One pure, unit-tested state-machine table. States: CREATED, MATCHING, ASSIGNED, ARRIVED, IN_PROGRESS, UNDER_REVIEW, REWORK_REQUESTED, COMPLETED, CANCELLED. Illegal transition = 409 with a stable error code. Every accepted transition writes job_event + audit_log in the same DB transaction.
+2. One pure, unit-tested state-machine table. States (BUILD_SPEC §2): DRAFT, REQUESTED, MATCHED, CONFIRMED, ARRIVED, IN_PROGRESS, PROOF_UPLOADED, UNDER_REVIEW, REWORK, COMPLETED, SETTLED (+ CANCELLED, an added terminal state; see ADR 0006). Illegal transition = 409 with a stable error code. Every accepted transition writes job_event + audit_log in the same DB transaction.
 3. Concurrency: transactions + SELECT FOR UPDATE and/or version-checked UPDATE, backed by DB constraints: partial unique index (one active assignment per technician), exclusion constraint on overlapping windows, unique settlement per request, atomic one-shot OTP consume. Parallel confirms: exactly one 200, one deterministic 409.
 4. Idempotency-Key on confirm, arrive, start, stop, evidence finalize, review, settlement. Replay returns the original result; DB uniqueness is the backstop.
 5. OTP: crypto.randomInt, store HMAC hash only, TTL, max attempts + temporary lock, constant-time compare, uniform error text, never logged.
