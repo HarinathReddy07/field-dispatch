@@ -40,7 +40,7 @@ CREATE TABLE service_requests (
   window_start        timestamptz NOT NULL,
   window_end          timestamptz NOT NULL,
   notes               text,
-  state               text NOT NULL DEFAULT 'CREATED',
+  state               text NOT NULL DEFAULT 'DRAFT',
   quote_minor         integer,
   version             integer NOT NULL DEFAULT 0,
   work_cycle          integer NOT NULL DEFAULT 1,
@@ -50,17 +50,17 @@ CREATE TABLE service_requests (
   created_at          timestamptz NOT NULL DEFAULT now(),
   updated_at          timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT sr_state_chk CHECK (state IN (
-    'CREATED', 'MATCHING', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS',
-    'UNDER_REVIEW', 'REWORK_REQUESTED', 'COMPLETED', 'CANCELLED')),
+    'DRAFT', 'REQUESTED', 'MATCHED', 'CONFIRMED', 'ARRIVED', 'IN_PROGRESS', 'PROOF_UPLOADED',
+    'UNDER_REVIEW', 'REWORK', 'COMPLETED', 'SETTLED', 'CANCELLED')),
   CONSTRAINT sr_category_chk CHECK (category IN ('ELECTRICAL_INSPECTION', 'MECHANICAL_INSPECTION')),
   CONSTRAINT sr_window_chk CHECK (window_end > window_start),
   CONSTRAINT sr_quote_chk CHECK (quote_minor IS NULL OR quote_minor > 0),
   CONSTRAINT sr_version_chk CHECK (version >= 0),
   CONSTRAINT sr_work_cycle_chk CHECK (work_cycle >= 1),
   CONSTRAINT sr_review_deadline_chk CHECK (state <> 'UNDER_REVIEW' OR review_deadline_at IS NOT NULL),
-  CONSTRAINT sr_started_chk CHECK (state NOT IN ('IN_PROGRESS', 'UNDER_REVIEW') OR started_at IS NOT NULL),
+  CONSTRAINT sr_started_chk CHECK (state NOT IN ('IN_PROGRESS', 'PROOF_UPLOADED', 'UNDER_REVIEW') OR started_at IS NOT NULL),
   CONSTRAINT sr_quote_required_chk CHECK (
-    state NOT IN ('ASSIGNED', 'ARRIVED', 'IN_PROGRESS', 'UNDER_REVIEW', 'REWORK_REQUESTED', 'COMPLETED')
+    state NOT IN ('CONFIRMED', 'ARRIVED', 'IN_PROGRESS', 'PROOF_UPLOADED', 'UNDER_REVIEW', 'REWORK', 'COMPLETED', 'SETTLED')
     OR quote_minor IS NOT NULL)
 );
 CREATE INDEX sr_requester_idx ON service_requests (requester_id, created_at DESC);

@@ -4,20 +4,24 @@ export const RoleSchema = z.enum(['REQUESTER', 'TECHNICIAN', 'ADMIN']);
 export type Role = z.infer<typeof RoleSchema>;
 
 export const REQUEST_STATES = [
-  'CREATED',
-  'MATCHING',
-  'ASSIGNED',
+  'DRAFT',
+  'REQUESTED',
+  'MATCHED',
+  'CONFIRMED',
   'ARRIVED',
   'IN_PROGRESS',
+  'PROOF_UPLOADED',
   'UNDER_REVIEW',
-  'REWORK_REQUESTED',
+  'REWORK',
   'COMPLETED',
+  'SETTLED',
   'CANCELLED',
 ] as const;
 export const RequestStateSchema = z.enum(REQUEST_STATES);
 export type RequestState = z.infer<typeof RequestStateSchema>;
 
-export const TERMINAL_STATES: readonly RequestState[] = ['COMPLETED', 'CANCELLED'];
+/** COMPLETED is transient: completion and settlement commit together, so it only exists inside a transaction. */
+export const TERMINAL_STATES: readonly RequestState[] = ['SETTLED', 'CANCELLED'];
 
 export const AssignmentStatusSchema = z.enum(['ACTIVE', 'COMPLETED', 'CANCELLED', 'REASSIGNED']);
 export type AssignmentStatus = z.infer<typeof AssignmentStatusSchema>;

@@ -43,6 +43,21 @@ export const CreateRequestSchema = strict({
 });
 export type CreateRequestDto = z.infer<typeof CreateRequestSchema>;
 
+/** Edit a REQUESTED request (REQUESTED -> DRAFT -> REQUESTED). At least one field is required. */
+export const UpdateRequestSchema = strict({
+  assetId: z.string().trim().min(1).max(64).optional(),
+  category: CategorySchema.optional(),
+  location: LocationSchema.optional(),
+  windowStart: z.string().datetime().optional(),
+  windowEnd: z.string().datetime().optional(),
+  notes: z.string().trim().max(1000).optional(),
+})
+  .refine((v) => Object.keys(v).length > 0, { message: 'at least one field is required' })
+  .refine((v) => (v.windowStart === undefined) === (v.windowEnd === undefined), {
+    message: 'windowStart and windowEnd must be provided together',
+  });
+export type UpdateRequestDto = z.infer<typeof UpdateRequestSchema>;
+
 export const NearbyQuerySchema = strict({
   radiusKm: z.coerce.number().positive().max(100).optional(),
   limit: z.coerce.number().int().positive().max(20).optional(),

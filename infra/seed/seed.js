@@ -153,7 +153,7 @@ async function seed(databaseUrl) {
             state, quote_minor, version, work_cycle, started_at, created_at, updated_at)
          VALUES ($1,$2,'ELECTRICAL_INSPECTION','PANEL-BLR-0042', ST_SetSRID(ST_MakePoint(77.6101, 12.9719),4326)::geography,
             now() - interval '3 days', now() - interval '3 days' + interval '2 hours', 'Synthetic completed inspection',
-            'COMPLETED', 52500, 6, 1, now() - interval '3 days' + interval '20 minutes', now() - interval '3 days', now() - interval '3 days')`,
+            'SETTLED', 52500, 10, 1, now() - interval '3 days' + interval '20 minutes', now() - interval '3 days', now() - interval '3 days')`,
         [REQ_COMPLETED, id(11)],
       );
       await client.query(
@@ -163,12 +163,16 @@ async function seed(databaseUrl) {
         [id(201), REQ_COMPLETED, id(21)],
       );
       const steps = [
-        [null, 'CREATED', 'CREATE', 'REQUESTER', id(11)],
-        ['CREATED', 'ASSIGNED', 'CONFIRM', 'REQUESTER', id(11)],
-        ['ASSIGNED', 'ARRIVED', 'ARRIVE', 'TECHNICIAN', id(21)],
+        [null, 'DRAFT', 'CREATE', 'REQUESTER', id(11)],
+        ['DRAFT', 'REQUESTED', 'SUBMIT', 'REQUESTER', id(11)],
+        ['REQUESTED', 'MATCHED', 'SEARCH', 'REQUESTER', id(11)],
+        ['MATCHED', 'CONFIRMED', 'CONFIRM', 'REQUESTER', id(11)],
+        ['CONFIRMED', 'ARRIVED', 'ARRIVE', 'TECHNICIAN', id(21)],
         ['ARRIVED', 'IN_PROGRESS', 'START', 'TECHNICIAN', id(21)],
-        ['IN_PROGRESS', 'UNDER_REVIEW', 'STOP', 'TECHNICIAN', id(21)],
+        ['IN_PROGRESS', 'PROOF_UPLOADED', 'STOP', 'TECHNICIAN', id(21)],
+        ['PROOF_UPLOADED', 'UNDER_REVIEW', 'SUBMIT_REVIEW', 'TECHNICIAN', id(21)],
         ['UNDER_REVIEW', 'COMPLETED', 'APPROVE', 'REQUESTER', id(11)],
+        ['COMPLETED', 'SETTLED', 'SETTLE', 'SYSTEM', null],
       ];
       for (const [from, to, action, role, actor] of steps) {
         await client.query(
@@ -201,10 +205,24 @@ async function seed(databaseUrl) {
     await client.query(
       `INSERT INTO service_requests (id, requester_id, category, asset_id, location, window_start, window_end, notes, state)
        VALUES ($1,$2,'ELECTRICAL_INSPECTION','TRANSFORMER-BLR-0107', ST_SetSRID(ST_MakePoint(77.6033, 12.9748),4326)::geography,
-          now() + interval '1 hour', now() + interval '3 hours', 'Synthetic live-demo request', 'CREATED')
+          now() + interval '1 hour', now() + interval '3 hours', 'Synthetic live-demo request', 'REQUESTED')
        ON CONFLICT (id) DO NOTHING`,
       [REQ_FRESH, id(11)],
     );
+
+    const freshEvents = await client.query('SELECT 1 FROM job_events WHERE request_id = $1', [REQ_FRESH]);
+    if (freshEvents.rowCount === 0) {
+      for (const [from, to, action] of [
+        [null, 'DRAFT', 'CREATE'],
+        ['DRAFT', 'REQUESTED', 'SUBMIT'],
+      ]) {
+        await client.query(
+          `INSERT INTO job_events (request_id, state_from, state_to, action, actor_id, actor_role, metadata)
+           VALUES ($1,$2,$3,$4,$5,'REQUESTER','{"seeded":true}')`,
+          [REQ_FRESH, from, to, action, id(11)],
+        );
+      }
+    }
 
     // --- busy technician (Gita) has an in-progress job ---
     const busy = await client.query('SELECT 1 FROM service_requests WHERE id = $1', [REQ_BUSY]);
@@ -214,7 +232,7 @@ async function seed(databaseUrl) {
             state, quote_minor, version, started_at)
          VALUES ($1,$2,'MECHANICAL_INSPECTION','PUMP-BLR-0311', ST_SetSRID(ST_MakePoint(77.5963, 13.1007),4326)::geography,
             now() - interval '30 minutes', now() + interval '2 hours', 'Synthetic busy-technician job',
-            'IN_PROGRESS', 78000, 4, now() - interval '10 minutes')`,
+            'IN_PROGRESS', 78000, 6, now() - interval '10 minutes')`,
         [REQ_BUSY, id(12)],
       );
       await client.query(
@@ -223,9 +241,11 @@ async function seed(databaseUrl) {
         [id(202), REQ_BUSY, id(27)],
       );
       for (const [from, to, action, role, actor] of [
-        [null, 'CREATED', 'CREATE', 'REQUESTER', id(12)],
-        ['CREATED', 'ASSIGNED', 'CONFIRM', 'REQUESTER', id(12)],
-        ['ASSIGNED', 'ARRIVED', 'ARRIVE', 'TECHNICIAN', id(27)],
+        [null, 'DRAFT', 'CREATE', 'REQUESTER', id(12)],
+        ['DRAFT', 'REQUESTED', 'SUBMIT', 'REQUESTER', id(12)],
+        ['REQUESTED', 'MATCHED', 'SEARCH', 'REQUESTER', id(12)],
+        ['MATCHED', 'CONFIRMED', 'CONFIRM', 'REQUESTER', id(12)],
+        ['CONFIRMED', 'ARRIVED', 'ARRIVE', 'TECHNICIAN', id(27)],
         ['ARRIVED', 'IN_PROGRESS', 'START', 'TECHNICIAN', id(27)],
       ]) {
         await client.query(

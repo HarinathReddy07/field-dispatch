@@ -15,8 +15,8 @@ CREATE TABLE job_events (
   correlation_id text,
   occurred_at    timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT job_events_state_to_chk CHECK (state_to IN (
-    'CREATED', 'MATCHING', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS',
-    'UNDER_REVIEW', 'REWORK_REQUESTED', 'COMPLETED', 'CANCELLED')),
+    'DRAFT', 'REQUESTED', 'MATCHED', 'CONFIRMED', 'ARRIVED', 'IN_PROGRESS', 'PROOF_UPLOADED',
+    'UNDER_REVIEW', 'REWORK', 'COMPLETED', 'SETTLED', 'CANCELLED')),
   CONSTRAINT job_events_actor_role_chk CHECK (actor_role IN ('REQUESTER', 'TECHNICIAN', 'ADMIN', 'SYSTEM'))
 );
 CREATE UNIQUE INDEX job_events_seq_uq ON job_events (seq);
