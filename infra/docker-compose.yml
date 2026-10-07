@@ -65,6 +65,36 @@ services:
       mc anonymous set none local/$$S3_BUCKET"
     restart: 'no'
 
+  # One-shot: applies SQL migrations (idempotent, advisory-locked). Runs automatically before the api starts.
+  migrate:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    working_dir: /repo
+    command: ['node', 'infra/scripts/migrate.js']
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-dispatch}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-dispatch}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  # One-shot, on demand:  docker compose ... run --rm seed   (idempotent synthetic demo data)
+  seed:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    working_dir: /repo
+    command: ['node', 'infra/seed/seed.js']
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-dispatch}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-dispatch}
+      SEED_PASSWORD: ${SEED_PASSWORD:-Passw0rd!dev}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    profiles: ['tools']
+    restart: 'no'
+
   api:
     build:
       context: ..
@@ -76,6 +106,8 @@ services:
       S3_ENDPOINT: http://minio:9000
       PORT: '3000'
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
