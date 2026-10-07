@@ -1,0 +1,71 @@
+@import 'tailwindcss';
+
+/* One set of tokens: every component uses these, so the console stays visually consistent. */
+:root {
+  --surface: #ffffff;
+  --surface-muted: #f4f6f8;
+  --border: #dde2e8;
+  --ink: #16202a;
+  --ink-muted: #5b6876;
+  --brand: #1d4ed8;
+  --brand-ink: #ffffff;
+  --tone-neutral-bg: #eceff3;
+  --tone-neutral-ink: #3a4654;
+  --tone-info-bg: #dbeafe;
+  --tone-info-ink: #1e40af;
+  --tone-warn-bg: #fef3c7;
+  --tone-warn-ink: #92400e;
+  --tone-good-bg: #dcfce7;
+  --tone-good-ink: #166534;
+  --tone-bad-bg: #fee2e2;
+  --tone-bad-ink: #991b1b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #131a22;
+    --surface-muted: #0d1218;
+    --border: #2a3541;
+    --ink: #e8edf2;
+    --ink-muted: #9aa7b5;
+    --brand: #60a5fa;
+    --brand-ink: #0b1220;
+    --tone-neutral-bg: #26303b;
+    --tone-neutral-ink: #cbd5e1;
+    --tone-info-bg: #1e3a8a;
+    --tone-info-ink: #bfdbfe;
+    --tone-warn-bg: #78350f;
+    --tone-warn-ink: #fde68a;
+    --tone-good-bg: #14532d;
+    --tone-good-ink: #bbf7d0;
+    --tone-bad-bg: #7f1d1d;
+    --tone-bad-ink: #fecaca;
+  }
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-muted: var(--surface-muted);
+  --color-line: var(--border);
+  --color-ink: var(--ink);
+  --color-soft: var(--ink-muted);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--surface-muted);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.leaflet-container {
+  font-family: inherit;
+}
