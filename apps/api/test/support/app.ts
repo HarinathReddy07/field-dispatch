@@ -43,17 +43,21 @@ export interface TestCtx {
   http: () => ReturnType<typeof request>;
   login: (email: string, password?: string) => Promise<string>;
   sql: <T = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<T[]>;
-  close: () => Promise<void>;
+  close: (o?: { keepDb?: boolean }) => Promise<void>;
 }
 
 export interface TestAppOptions {
   env?: Record<string, string>;
   seedData?: boolean;
+  /** Reuse an existing (already migrated/seeded) database, e.g. to simulate an API restart. */
+  db?: TestDb;
+  logStream?: import('node:stream').Writable;
+  logLevel?: string;
 }
 
 export async function createTestApp(opts: TestAppOptions = {}): Promise<TestCtx> {
-  const db = await createTestDatabase();
-  if (opts.seedData !== false) await seed(db.url);
+  const db = opts.db ?? (await createTestDatabase());
+  if (!opts.db && opts.seedData !== false) await seed(db.url);
 
   const redisBase = process.env.TEST_REDIS_URL;
   if (!redisBase) throw new Error('TEST_REDIS_URL is not set (global setup did not run)');
@@ -78,18 +82,22 @@ export async function createTestApp(opts: TestAppOptions = {}): Promise<TestCtx>
     ...opts.env,
   });
 
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule.forRoot(env)] }).compile();
+  const moduleRef = await Test.createTestingModule({
+    imports: [AppModule.forRoot(env, { stream: opts.logStream, level: opts.logLevel })],
+  }).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false, logger: false });
-  configureApp(app, env);
+  await configureApp(app, env);
   await app.init();
   await app.listen(0); // listening server => supertest reuses it (no per-request server) and sockets work
 
   const pool = new Pool({ connectionString: db.url, max: 5 });
   // Fresh Redis keyspace for this suite (throttle counters, presence, location cache).
   const { default: Redis } = await import('ioredis');
-  const r = new Redis(redisUrl);
-  await r.flushdb();
-  r.disconnect();
+  if (!opts.db) {
+    const r = new Redis(redisUrl);
+    await r.flushdb();
+    r.disconnect();
+  }
 
   const http = () => request(app.getHttpServer());
   const login = async (email: string, password = DEV_PASSWORD): Promise<string> => {
@@ -105,10 +113,10 @@ export async function createTestApp(opts: TestAppOptions = {}): Promise<TestCtx>
     http,
     login,
     sql: async <T>(text: string, params: unknown[] = []) => (await pool.query(text, params)).rows as T[],
-    close: async () => {
+    close: async (o) => {
       await app.close();
       await pool.end();
-      await db.drop();
+      if (!o?.keepDb) await db.drop();
     },
   };
 }
