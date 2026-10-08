@@ -222,8 +222,27 @@ describe('A5 authorization and admin operations', () => {
     );
     expect(res.body).toMatchObject({ state: 'CONFIRMED', workCycle: 2, startedAt: null });
     expect(res.body.technician.id).toBe(TECH_ID(4));
-    expect((await flow.get('tech1', `/requests/${id}`)).status).toBe(200); // history still readable
+    // information hiding: a technician removed by the reassign loses ALL read access at once (job, snapshot, evidence)
+    for (const path of [`/requests/${id}`, `/requests/${id}/snapshot`, `/requests/${id}/evidence`]) {
+      expect((await flow.get('tech1', path)).status).toBe(404);
+    }
+    expect((await flow.get('tech4', `/requests/${id}`)).status).toBe(200); // the new technician has it
     expect((await flow.uploadEvidence(id, 'tech1')).status).toBe(404);
+  });
+
+  it('read access follows the assignment: the completing technician keeps it, a released technician loses it', async () => {
+    const done = await flow.underReview(1, 'requester1');
+    expect((await flow.review(done.id, { decision: 'APPROVE' })).status).toBe(200);
+    expect((await flow.get('tech1', `/requests/${done.id}`)).status).toBe(200);
+    const history = await flow.get('tech1', '/requests/history');
+    expect((history.body as { id: string }[]).some((j) => j.id === done.id)).toBe(true);
+
+    const id = await flow.assigned(2, 'requester1');
+    expect((await flow.get('tech2', `/requests/${id}`)).status).toBe(200);
+    expect((await flow.post('requester1', `/requests/${id}/cancel`, {})).status).toBe(200); // release technician
+    expect((await flow.get('tech2', `/requests/${id}`)).status).toBe(404);
+    const after = await flow.get('tech2', '/requests/history');
+    expect((after.body as { id: string }[]).some((j) => j.id === id)).toBe(false);
   });
 
   it('cancel requires a reason, frees the technician, and cannot touch finished jobs', async () => {

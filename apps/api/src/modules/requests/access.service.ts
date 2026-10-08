@@ -7,7 +7,8 @@ import { Db } from '../../infra/prisma.service';
  * Ownership policy for a request. Anything the caller may not see is reported as NOT_FOUND (404),
  * never 403, so ids can't be probed (IDOR).
  *   REQUESTER  -> owns the request
- *   TECHNICIAN -> has (or had) an assignment on it
+ *   TECHNICIAN -> holds the ACTIVE assignment, or completed the job. A technician removed by an admin reassign
+ *                 or released by the requester loses read access at once (no state, snapshot or evidence).
  *   ADMIN      -> any
  */
 @Injectable()
@@ -15,7 +16,9 @@ export class AccessService {
   async canView(db: Db, user: Pick<AuthUser, 'id' | 'role'>, requestId: string): Promise<boolean> {
     const rows = await db.$queryRaw<{ requester_id: string; is_tech: boolean }[]>`
       SELECT r.requester_id::text AS requester_id,
-             EXISTS (SELECT 1 FROM assignments a WHERE a.request_id = r.id AND a.technician_id = ${user.id}::uuid) AS is_tech
+             EXISTS (SELECT 1 FROM assignments a
+                     WHERE a.request_id = r.id AND a.technician_id = ${user.id}::uuid
+                       AND a.status IN ('ACTIVE', 'COMPLETED')) AS is_tech
       FROM service_requests r WHERE r.id = ${requestId}::uuid`;
     const row = rows[0];
     if (!row) return false;

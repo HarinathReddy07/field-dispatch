@@ -102,11 +102,11 @@ export class RequestsService {
 
   private participantFilter(user: AuthUser): Prisma.Sql {
     return user.role === 'TECHNICIAN'
-      ? Prisma.sql`EXISTS (SELECT 1 FROM assignments a WHERE a.request_id = r.id AND a.technician_id = ${user.id}::uuid)`
+      ? Prisma.sql`EXISTS (SELECT 1 FROM assignments a WHERE a.request_id = r.id AND a.technician_id = ${user.id}::uuid AND a.status IN ('ACTIVE', 'COMPLETED'))`
       : Prisma.sql`r.requester_id = ${user.id}::uuid`;
   }
 
-  /** Completed / cancelled requests for the caller (requester: own; technician: ones they worked). */
+  /** Completed / cancelled requests for the caller (requester: own; technician: jobs they completed). */
   history(user: AuthUser, page: number): Promise<RequestView[]> {
     const where = Prisma.sql`${this.participantFilter(user)} AND r.state IN ('COMPLETED', 'SETTLED', 'CANCELLED')`;
     return this.repo.listViews(this.prisma, where, PAGE_SIZE, (page - 1) * PAGE_SIZE);
