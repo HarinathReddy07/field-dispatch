@@ -68,6 +68,7 @@ export default function ComponentsPage() {
   const [dialog, setDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [on, setOn] = useState(true);
+  const [fetchedAt] = useState(() => Date.now());
   const [page, setPage] = useState(2);
   const [selected, setSelected] = useState<string | null>('2');
 
@@ -152,7 +153,7 @@ export default function ComponentsPage() {
             <ElapsedTimer
               startedAt="2030-01-01T10:00:00Z"
               serverTime="2030-01-01T10:12:05Z"
-              fetchedAt={Date.now()}
+              fetchedAt={fetchedAt}
             />
           </KeyValueRow>
           <KeyValueRow label="Correlation" mono>
