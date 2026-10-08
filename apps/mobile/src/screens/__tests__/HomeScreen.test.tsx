@@ -86,12 +86,12 @@ describe('requester home', () => {
 
     expect(screen.getByText('Your requests')).toBeTruthy();
     expect(screen.getByText('PANEL-42')).toBeTruthy();
-    expect(screen.getByText('Technician booked')).toBeTruthy();
+    expect(screen.getByText('Assigned')).toBeTruthy();
     expect(screen.queryByText('Go online')).toBeNull(); // technician controls are not shown to a requester
 
-    await fireEvent.press(screen.getByLabelText('PANEL-42, Technician booked'));
+    await fireEvent.press(screen.getByLabelText('PANEL-42, Assigned'));
     expect((navigation as { navigate: jest.Mock }).navigate).toHaveBeenCalledWith('Job', { requestId: 'r1' });
-    await fireEvent.press(screen.getByLabelText('PUMP-1, Choose a technician'));
+    await fireEvent.press(screen.getByLabelText('PUMP-1, Choose technician'));
     expect((navigation as { navigate: jest.Mock }).navigate).toHaveBeenCalledWith('Nearby', {
       requestId: 'r2',
     });
@@ -139,9 +139,9 @@ describe('technician home', () => {
     await render(<HomeScreen navigation={navigation} route={route} />);
     expect(screen.getByText('Your jobs')).toBeTruthy();
     expect(screen.getByText('Busy with a job')).toBeTruthy();
-    expect(screen.getByText('Technician on site')).toBeTruthy();
+    expect(screen.getByText('On site')).toBeTruthy();
     expect(screen.queryByLabelText('New request')).toBeNull(); // requester controls are not shown to a technician
-    await fireEvent.press(screen.getByLabelText('PANEL-42, Technician on site'));
+    await fireEvent.press(screen.getByLabelText('PANEL-42, On site'));
     expect((navigation as { navigate: jest.Mock }).navigate).toHaveBeenCalledWith('Job', { requestId: 'r1' });
   });
 

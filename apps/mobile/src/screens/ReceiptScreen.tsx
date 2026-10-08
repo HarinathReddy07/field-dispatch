@@ -1,4 +1,3 @@
-import { Text } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useRequest } from '../api/hooks';
 import type { RootStackParams } from '../navigation/types';
@@ -31,13 +30,11 @@ export function ReceiptScreen({ route }: Props) {
         <Body soft>{new Date(v.updatedAt).toLocaleString()}</Body>
       </Card>
       {v.settlement ? (
-        <Card title="Payment (mock ledger)">
-          <Text style={{ fontSize: 32, fontWeight: '800' }}>{money(v.settlement.amountMinor)}</Text>
+        <Card title="Mock settlement">
+          <Title>{money(v.settlement.amountMinor)}</Title>
           <Body>Status: {v.settlement.status.toLowerCase()}</Body>
           <Body soft>Reference</Body>
-          <Text selectable style={{ fontFamily: 'monospace' }}>
-            {v.settlement.providerRef}
-          </Text>
+          <Body mono>{v.settlement.providerRef}</Body>
         </Card>
       ) : (
         <Empty

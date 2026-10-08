@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHistory, useReorder } from '../api/hooks';
 import type { RootStackParams } from '../navigation/types';
@@ -42,13 +42,13 @@ export function HistoryScreen({ navigation }: Props) {
           >
             <Card>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontWeight: '700', fontSize: 16 }}>{j.assetId}</Text>
+                <Body strong>{j.assetId}</Body>
                 <Badge tone={j.state === 'CANCELLED' ? 'bad' : 'good'}>
                   {j.state === 'CANCELLED' ? 'Cancelled' : 'Completed'}
                 </Badge>
               </View>
               <Body soft>{new Date(j.updatedAt).toLocaleDateString()}</Body>
-              {j.settlement ? <Body>{money(j.settlement.amountMinor)}</Body> : null}
+              {j.settlement ? <Body>Mock settlement · {money(j.settlement.amountMinor)}</Body> : null}
               {role === 'REQUESTER' && (
                 <Button
                   label="Order again"

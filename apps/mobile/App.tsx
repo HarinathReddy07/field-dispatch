@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -17,6 +17,7 @@ import { NearbyScreen } from './src/screens/NearbyScreen';
 import { ReceiptScreen } from './src/screens/ReceiptScreen';
 import { useSession } from './src/state/session';
 import { Body, ErrorBox, Loading, Screen } from './src/ui/components';
+import { useTheme } from './src/ui/theme';
 
 const Stack = createNativeStackNavigator<RootStackParams>();
 
@@ -59,7 +60,7 @@ function Root() {
   if (status === 'anon' || !user) return <LoginScreen />;
 
   return (
-    <Stack.Navigator>
+    <Stack.Navigator screenOptions={{ headerShadowVisible: false, headerTitleStyle: { fontWeight: '600' } }}>
       <Stack.Screen
         name="Home"
         component={HomeScreen}
@@ -80,10 +81,24 @@ function Root() {
 }
 
 export default function App() {
+  const { scheme, c } = useTheme();
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: c.primary,
+      background: c.bg,
+      card: c.surface,
+      text: c.text,
+      border: c.border,
+      notification: c.primary,
+    },
+  };
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <NavigationContainer>
+        <NavigationContainer theme={navTheme}>
           <Root />
           <StatusBar style="auto" />
         </NavigationContainer>

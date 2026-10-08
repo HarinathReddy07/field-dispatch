@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import { Text } from 'react-native';
 import { LoginSchema } from '@dispatch/contracts';
 import { ApiError } from '../api/client';
 import { useSession } from '../state/session';
-import { Body, Button, Card, Field, Screen, Title } from '../ui/components';
-import { theme } from '../ui/theme';
+import { Body, Button, Card, Field, InlineAlert, Screen, Title } from '../ui/components';
 
 export function LoginScreen() {
   const signIn = useSession((s) => s.signIn);
@@ -47,11 +45,7 @@ export function LoginScreen() {
           autoComplete="password"
           textContentType="password"
         />
-        {error ? (
-          <Text accessibilityRole="alert" style={{ color: theme.color.danger }}>
-            {error}
-          </Text>
-        ) : null}
+        {error ? <InlineAlert>{error}</InlineAlert> : null}
         <Button label="Sign in" onPress={submit} />
       </Card>
     </Screen>

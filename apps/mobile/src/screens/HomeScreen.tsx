@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RequestView } from '@dispatch/contracts';
 import { useActive, useAvailability } from '../api/hooks';
@@ -7,7 +7,21 @@ import type { ApiError } from '../api/client';
 import { stateUi } from '../lib/state-ui';
 import type { RootStackParams } from '../navigation/types';
 import { useSession } from '../state/session';
-import { Badge, Body, Button, Card, Empty, ErrorBox, Loading, Screen, Title, money } from '../ui/components';
+import { stateStyle } from '@dispatch/ui-tokens';
+import {
+  Badge,
+  Body,
+  Button,
+  Card,
+  Empty,
+  ErrorBox,
+  Loading,
+  Screen,
+  StateStepper,
+  StatusBadge,
+  Title,
+  money,
+} from '../ui/components';
 
 type Props = NativeStackScreenProps<RootStackParams, 'Home'>;
 
@@ -29,6 +43,13 @@ function AdminNotice() {
   );
 }
 
+const NEXT_ACTION: Partial<Record<RequestView['state'], string>> = {
+  CONFIRMED: 'Enter arrival code',
+  ARRIVED: 'Start work',
+  IN_PROGRESS: 'Add evidence',
+  REWORK: 'Add evidence',
+};
+
 function JobCard({
   job,
   onPress,
@@ -39,21 +60,24 @@ function JobCard({
   role: 'REQUESTER' | 'TECHNICIAN';
 }) {
   const ui = stateUi(role, job.state);
+  const next = role === 'TECHNICIAN' ? NEXT_ACTION[job.state] : undefined;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${job.assetId}, ${ui.label}`}
+      accessibilityLabel={`${job.assetId}, ${stateStyle(job.state).label}`}
       style={{ minHeight: 44 }}
     >
       <Card>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontWeight: '700', fontSize: 16 }}>{job.assetId}</Text>
-          <Badge tone={ui.tone}>{ui.label}</Badge>
+          <Body strong>{job.assetId}</Body>
+          <StatusBadge state={job.state} />
         </View>
         <Body soft>{job.category.replace(/_/g, ' ').toLowerCase()}</Body>
+        <StateStepper state={job.state} />
         <Body>{ui.headline}</Body>
         {job.quoteMinor ? <Body soft>Quote {money(job.quoteMinor)}</Body> : null}
+        {next ? <Button label={next} onPress={onPress} /> : null}
       </Card>
     </Pressable>
   );
@@ -80,12 +104,8 @@ function RequesterHome({ navigation }: Props) {
       ) : (
         active.data.map((j) => <JobCard key={j.id} job={j} role="REQUESTER" onPress={() => go(j)} />)
       )}
-      <Button
-        label="History and receipts"
-        variant="secondary"
-        onPress={() => navigation.navigate('History')}
-      />
-      <Button label="Sign out" variant="secondary" onPress={signOut} />
+      <Button label="History and receipts" variant="ghost" onPress={() => navigation.navigate('History')} />
+      <Button label="Sign out" variant="ghost" onPress={signOut} />
     </Screen>
   );
 }
@@ -110,6 +130,9 @@ function TechnicianHome({ navigation }: Props) {
     <Screen onRefresh={() => void active.refetch()} refreshing={active.isRefetching}>
       <Title>Your jobs</Title>
       <Card title="Availability">
+        <Badge tone={hasJob ? 'warn' : online ? 'good' : 'neutral'}>
+          {hasJob ? 'Busy' : online ? 'Available' : 'Offline'}
+        </Badge>
         <Body>
           {hasJob
             ? 'Busy with a job'
@@ -121,21 +144,12 @@ function TechnicianHome({ navigation }: Props) {
         </Body>
         {availability.isError ? <ErrorBox error={availability.error as ApiError} /> : null}
         {!hasJob && (
-          <View style={{ gap: 8 }}>
-            <Button
-              label="Go online"
-              busy={availability.isPending}
-              disabled={online === true}
-              onPress={() => toggle('AVAILABLE')}
-            />
-            <Button
-              label="Go offline"
-              variant="secondary"
-              busy={availability.isPending}
-              disabled={online === false}
-              onPress={() => toggle('OFFLINE')}
-            />
-          </View>
+          <Button
+            label={online === true ? 'Go offline' : 'Go online'}
+            variant={online === true ? 'secondary' : 'primary'}
+            busy={availability.isPending}
+            onPress={() => toggle(online === true ? 'OFFLINE' : 'AVAILABLE')}
+          />
         )}
       </Card>
       {active.isPending ? (
@@ -154,8 +168,8 @@ function TechnicianHome({ navigation }: Props) {
           />
         ))
       )}
-      <Button label="Completed jobs" variant="secondary" onPress={() => navigation.navigate('History')} />
-      <Button label="Sign out" variant="secondary" onPress={signOut} />
+      <Button label="Completed jobs" variant="ghost" onPress={() => navigation.navigate('History')} />
+      <Button label="Sign out" variant="ghost" onPress={signOut} />
     </Screen>
   );
 }

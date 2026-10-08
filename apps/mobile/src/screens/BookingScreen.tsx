@@ -1,4 +1,3 @@
-import { Text } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useRequest } from '../api/hooks';
 import type { RootStackParams } from '../navigation/types';
@@ -28,20 +27,13 @@ export function BookingScreen({ route, navigation }: Props) {
     <Screen>
       <Title>Booking confirmed</Title>
       <Card title="Your technician">
-        <Text style={{ fontSize: 20, fontWeight: '700' }}>{v.technician?.name ?? '—'}</Text>
+        <Body strong>{v.technician?.name ?? '—'}</Body>
         <Body soft>{v.technician ? `${v.technician.rating.toFixed(1)} ★` : ''}</Body>
       </Card>
       <Card title="Final quote">
-        <Text
-          style={{ fontSize: 32, fontWeight: '800' }}
-          accessibilityLabel={`Final quote ${money(v.quoteMinor)}`}
-        >
-          {money(v.quoteMinor)}
-        </Text>
+        <Title>{money(v.quoteMinor)}</Title>
         <Body soft>Assignment ID</Body>
-        <Text selectable style={{ fontFamily: 'monospace' }}>
-          {v.technician?.assignmentId ?? '—'}
-        </Text>
+        <Body mono>{v.technician?.assignmentId ?? '—'}</Body>
       </Card>
       <Body>
         The technician has been notified instantly. Share the arrival code when they reach your site.

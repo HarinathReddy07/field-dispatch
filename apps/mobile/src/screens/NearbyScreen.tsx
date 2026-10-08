@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useConfirm, useNearby } from '../api/hooks';
 import type { RootStackParams } from '../navigation/types';
@@ -32,17 +32,18 @@ export function NearbyScreen({ route, navigation }: Props) {
       ) : nearby.data.length === 0 ? (
         <Empty title="No technicians available nearby" hint="Pull down to search again in a moment." />
       ) : (
-        nearby.data.map((t) => (
+        nearby.data.map((t, i) => (
           <Card key={t.technicianId}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontWeight: '700', fontSize: 16 }}>{t.name}</Text>
+              <Body strong>{t.name}</Body>
               <Badge tone="good">{t.availability.toLowerCase()}</Badge>
             </View>
             <Body soft>
               {t.rating.toFixed(1)} ★ · {t.distanceKm.toFixed(1)} km away
             </Body>
-            <Text style={{ fontSize: 20, fontWeight: '700' }}>{money(t.quoteMinor)}</Text>
+            <Body strong>{money(t.quoteMinor)}</Body>
             <Button
+              variant={i === 0 ? 'primary' : 'secondary'}
               label={`Book ${t.name}`}
               busy={confirm.isPending && confirm.variables === t.technicianId}
               disabled={confirm.isPending}

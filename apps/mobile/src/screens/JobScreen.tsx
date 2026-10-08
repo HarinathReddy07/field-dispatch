@@ -18,15 +18,32 @@ import {
 import { ApiError } from '../api/client';
 import { useUploads } from '../evidence/useUploads';
 import { actionsFor, isFinished, stateUi } from '../lib/state-ui';
-import { elapsedSeconds, formatClock, secondsUntil } from '../lib/timer';
+import { formatClock, secondsUntil } from '../lib/timer';
 import { etaMinutes, haversineKm, simulateRoute } from '../lib/route';
 import { useNow } from '../lib/useNow';
 import type { RootStackParams } from '../navigation/types';
 import { useRequestRoom } from '../realtime/live';
 import { useSession } from '../state/session';
 import { useUi } from '../state/ui';
-import { Badge, Body, Button, Card, ErrorBox, Field, Loading, Screen, Title, money } from '../ui/components';
-import { theme } from '../ui/theme';
+import {
+  Body,
+  Button,
+  Card,
+  ElapsedTimer,
+  ErrorBox,
+  InlineAlert,
+  KeyValue,
+  Loading,
+  OtpInput,
+  PhotoTile,
+  ReasonSheet,
+  Screen,
+  StateStepper,
+  StatusBadge,
+  Title,
+  money,
+} from '../ui/components';
+import { theme, useTheme } from '../ui/theme';
 
 type Props = NativeStackScreenProps<RootStackParams, 'Job'>;
 
@@ -55,10 +72,11 @@ export function JobScreen({ route, navigation }: Props) {
   return (
     <Screen onRefresh={() => void req.refetch()} refreshing={req.isRefetching}>
       <Title>{job.assetId}</Title>
-      <View style={{ flexDirection: 'row', gap: theme.space.sm, alignItems: 'center' }}>
-        <Badge tone={ui.tone}>{ui.label}</Badge>
+      <View style={{ flexDirection: 'row', gap: theme.space.sm, alignItems: 'center', flexWrap: 'wrap' }}>
+        <StatusBadge state={job.state} />
         {job.technician && role === 'REQUESTER' ? <Body soft>{job.technician.name}</Body> : null}
       </View>
+      <StateStepper state={job.state} />
       <Body>{ui.headline}</Body>
 
       {role === 'TECHNICIAN' && <AssignmentCard job={job} />}
@@ -90,12 +108,12 @@ function AssignmentCard({ job }: { job: LiveRequest }) {
     void Linking.openURL(`geo:${lat},${lon}?q=${lat},${lon}(${encodeURIComponent(job.assetId)})`);
   return (
     <Card title="Assignment">
-      <Body>{job.category.replace(/_/g, ' ').toLowerCase()}</Body>
-      <Body soft>
-        Site: {lat.toFixed(4)}, {lon.toFixed(4)}
-      </Body>
-      {job.notes ? <Body soft>Notes: {job.notes}</Body> : null}
-      <Body>Quote {money(job.quoteMinor)}</Body>
+      <KeyValue label="Category">{job.category.replace(/_/g, ' ').toLowerCase()}</KeyValue>
+      <KeyValue label="Site">
+        {lat.toFixed(4)}, {lon.toFixed(4)}
+      </KeyValue>
+      {job.notes ? <KeyValue label="Notes">{job.notes}</KeyValue> : null}
+      <KeyValue label="Quote">{money(job.quoteMinor)}</KeyValue>
       {!isFinished(job.state) && <Button label="Navigate to site" variant="secondary" onPress={navigate} />}
       {__DEV__ && <SimulateDrive job={job} />}
     </Card>
@@ -156,22 +174,16 @@ function LiveLocationCard({ job }: { job: LiveRequest }) {
 
 /** Elapsed time while work is in progress, driven by the SERVER start time and server clock offset. */
 function WorkTimer({ job }: { job: LiveRequest }) {
-  const now = useNow();
   if (job.state !== 'IN_PROGRESS' || !job.startedAt) return null;
-  const secs = elapsedSeconds(job.startedAt, job.offsetMs, now);
   return (
     <Card title="Work timer">
-      <Text
-        style={{ fontSize: theme.font.hero, fontWeight: '800', fontVariant: ['tabular-nums'] }}
-        accessibilityLabel={`Elapsed ${formatClock(secs)}`}
-      >
-        {formatClock(secs)}
-      </Text>
+      <ElapsedTimer startedAt={job.startedAt} offsetMs={job.offsetMs} size={40} />
     </Card>
   );
 }
 
 function RequesterArrival({ job }: { job: LiveRequest }) {
+  const { c } = useTheme();
   const issue = useIssueOtp(job.id);
   const now = useNow();
   const exp = issue.data ? Date.parse(issue.data.expiresAt) : null;
@@ -182,7 +194,15 @@ function RequesterArrival({ job }: { job: LiveRequest }) {
       {issue.data && left !== 0 ? (
         <>
           <Text
-            style={{ fontSize: 44, fontWeight: '800', letterSpacing: 8 }}
+            style={{
+              fontSize: theme.font.otp,
+              lineHeight: 44,
+              fontWeight: '600',
+              letterSpacing: 7,
+              fontFamily: 'monospace',
+              fontVariant: ['tabular-nums'],
+              color: c.text,
+            }}
             accessibilityLabel={`Arrival code ${issue.data.otp.split('').join(' ')}`}
           >
             {issue.data.otp}
@@ -226,15 +246,7 @@ function TechnicianArrival({ job }: { job: LiveRequest }) {
   return (
     <Card title="Arrival code">
       <Body soft>Ask the customer for the 6-digit code.</Body>
-      <Field
-        label="Arrival code"
-        value={otp}
-        onChangeText={(t) => setOtp(t.replace(/\D/g, '').slice(0, 6))}
-        keyboardType="number-pad"
-        maxLength={6}
-        autoComplete="one-time-code"
-        error={error}
-      />
+      <OtpInput value={otp} onChange={setOtp} error={error} />
       <Button label="Confirm arrival" onPress={submit} />
     </Card>
   );
@@ -277,46 +289,22 @@ function EvidencePanel({ job }: { job: LiveRequest }) {
 
   return (
     <Card title="Evidence photos">
-      <Body>
-        {finalizedThisCycle} of 2 required photos uploaded{job.workCycle > 1 ? ' (rework round)' : ''}
+      <Body soft>
+        {Math.min(finalizedThisCycle, 2)} of 2 required{job.workCycle > 1 ? ' (rework round)' : ''}
       </Body>
       {uploads.items.map((u) => (
-        <View key={u.id} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.md }}>
-          <Image
-            source={{ uri: u.uri }}
-            style={{ width: 56, height: 56, borderRadius: 8 }}
-            accessibilityLabel="Captured photo"
-          />
-          <View style={{ flex: 1 }}>
-            <Body>
-              {u.status === 'done'
-                ? 'Uploaded'
-                : u.status === 'error'
-                  ? 'Failed'
-                  : u.status === 'uploading'
-                    ? `Uploading ${Math.round(u.progress * 100)}%`
-                    : u.status === 'finalizing'
-                      ? 'Verifying…'
-                      : 'Preparing…'}
-            </Body>
-            {u.error ? (
-              <Text style={{ color: theme.color.danger, fontSize: theme.font.small }}>{u.error}</Text>
-            ) : null}
-          </View>
-          {u.status === 'error' ? (
-            <Button label="Retry" variant="secondary" onPress={() => uploads.retry(u.id)} />
-          ) : null}
-        </View>
+        <PhotoTile
+          key={u.id}
+          uri={u.uri}
+          status={u.status}
+          progress={u.progress}
+          error={u.error}
+          onRetry={() => uploads.retry(u.id)}
+        />
       ))}
-      {pickError ? (
-        <Text accessibilityRole="alert" style={{ color: theme.color.danger }}>
-          {pickError}
-        </Text>
-      ) : null}
-      <Button label="Take a photo" onPress={() => capture(true)} />
-      {__DEV__ && (
-        <Button label="Pick from gallery (dev)" variant="secondary" onPress={() => capture(false)} />
-      )}
+      {pickError ? <InlineAlert>{pickError}</InlineAlert> : null}
+      <Button label="Take a photo" variant="secondary" onPress={() => capture(true)} />
+      {__DEV__ && <Button label="Pick from gallery (dev)" variant="ghost" onPress={() => capture(false)} />}
       {stop.isError ? <ErrorBox error={stop.error} /> : null}
       <Button
         label="Finish and submit for review"
@@ -333,15 +321,12 @@ function ReviewPanel({ job }: { job: LiveRequest }) {
   const evidence = useEvidence(job.id);
   const review = useReview(job.id);
   const now = useNow();
-  const [reason, setReason] = useState('');
-  const [reasonError, setReasonError] = useState<string | null>(null);
+  const [sheet, setSheet] = useState(false);
   const left = secondsUntil(job.reviewDeadlineAt, job.offsetMs, now);
 
-  const rework = async () => {
-    if (reason.trim().length < 3)
-      return setReasonError('Tell the technician what to fix (at least 3 characters).');
-    setReasonError(null);
-    await review.mutateAsync({ decision: 'REQUEST_REWORK', reason: reason.trim() }).catch(() => undefined);
+  const rework = async (reason: string) => {
+    await review.mutateAsync({ decision: 'REQUEST_REWORK', reason }).catch(() => undefined);
+    setSheet(false);
   };
   const approve = () =>
     new Promise<void>((resolve) =>
@@ -381,15 +366,16 @@ function ReviewPanel({ job }: { job: LiveRequest }) {
       )}
       {review.isError ? <ErrorBox error={review.error} /> : null}
       <Button label="Approve" busy={review.isPending} onPress={approve} />
-      <Field
-        label="Rework reason"
-        value={reason}
-        onChangeText={setReason}
-        multiline
-        maxLength={500}
-        error={reasonError}
+      <Button label="Request rework" variant="secondary" onPress={() => setSheet(true)} />
+      <ReasonSheet
+        visible={sheet}
+        title="Request rework"
+        description="Tell the technician what to fix."
+        confirmLabel="Send rework request"
+        busy={review.isPending}
+        onConfirm={rework}
+        onClose={() => setSheet(false)}
       />
-      <Button label="Request rework" variant="danger" busy={review.isPending} onPress={rework} />
     </Card>
   );
 }
