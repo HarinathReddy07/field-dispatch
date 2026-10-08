@@ -30,6 +30,7 @@ import {
   Button,
   Card,
   ElapsedTimer,
+  Empty,
   ErrorBox,
   InlineAlert,
   KeyValue,
@@ -62,7 +63,18 @@ export function JobScreen({ route, navigation }: Props) {
   if (req.isError)
     return (
       <Screen>
-        <ErrorBox error={req.error} onRetry={() => void req.refetch()} />
+        {req.error instanceof ApiError && req.error.status === 404 ? (
+          // 404 is also what a job you were removed from looks like (reassigned, released or cancelled)
+          <>
+            <Empty
+              title="This job is no longer available"
+              hint="It may have been reassigned, released or cancelled. Your current jobs are on the home screen."
+            />
+            <Button label="Back to jobs" onPress={() => navigation.popToTop()} />
+          </>
+        ) : (
+          <ErrorBox error={req.error} onRetry={() => void req.refetch()} />
+        )}
       </Screen>
     );
   const job = req.data;
