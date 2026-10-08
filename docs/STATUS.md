@@ -2,7 +2,7 @@
 
 Updated 2026-10-08 · branch `feat/ui`. Every "done" line below was proven by running something against a live stack
 (native PostgreSQL 16 + PostGIS 3.6, Redis 5, Node 24; the development machine has no Docker). An independent
-check-by-check pass found **69 items done, 19 partial, 1 missing, 0 fake**; the partials are almost all "written but never executed on the target platform" (Docker, a phone, real MinIO).
+check-by-check pass found **73 of 89 items built and verified, 15 partial, 1 missing, 0 fake** (counted after the latest fixes); the partials are almost all "written but never executed on the target platform" (Docker, a phone, real MinIO).
 
 ## At a glance
 
@@ -68,4 +68,4 @@ cp .env.example .env && make up && make seed && make e2e
 # Logins (dev only, password Passw0rd!dev): admin@dispatch.test · requester1@dispatch.test · tech1@dispatch.test
 ```
 
-Known limitations and the deliberate mocks (payments, GPS, KYC, in-memory storage for tests) are in [known-limitations.md](known-limitations.md).
+The requirement-by-requirement comparison is in [BUILT_VS_PENDING.md](BUILT_VS_PENDING.md). Known limitations and the deliberate mocks (payments, GPS, KYC, in-memory storage for tests) are in [known-limitations.md](known-limitations.md).

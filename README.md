@@ -11,7 +11,7 @@ with concurrency protection, an audit trail and an operations console.
 | Mobile (Requester + Technician) | React Native (Expo), TanStack Query, Zustand, socket.io-client, expo-secure-store                           | `apps/mobile`        |
 | Shared contracts                | zod DTOs, enums, state machine table, error codes, socket events                                            | `packages/contracts` |
 
-Docs: [architecture](docs/architecture.md) · [API](docs/api.md) · [test plan](docs/test-plan.md) · [runbook](docs/runbook.md) · [demo script](docs/demo-script.md) · [known limitations](docs/known-limitations.md) · [ADRs](docs/adr) · [status: done / still to do](docs/STATUS.md).
+Docs: [architecture](docs/architecture.md) · [API](docs/api.md) · [test plan](docs/test-plan.md) · [runbook](docs/runbook.md) · [demo script](docs/demo-script.md) · [known limitations](docs/known-limitations.md) · [ADRs](docs/adr) · [status: done / still to do](docs/STATUS.md) · [built vs pending](docs/BUILT_VS_PENDING.md).
 
 ## Quickstart (Docker)
 
