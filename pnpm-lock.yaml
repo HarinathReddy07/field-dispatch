@@ -506,6 +506,28 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  packages/ui-tokens:
+    dependencies:
+      '@dispatch/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@types/jest':
+        specifier: ^29.5.14
+        version: 29.5.14
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.5
+      jest:
+        specifier: ^29.7.0
+        version: 29.7.0(@types/node@22.20.5)(supports-color@8.1.1)
+      ts-jest:
+        specifier: ^29.2.5
+        version: 29.4.14(@babel/core@7.29.7(supports-color@8.1.1))(@jest/transform@29.7.0(supports-color@8.1.1))(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(jest-util@29.7.0)(jest@29.7.0(@types/node@22.20.5)(supports-color@8.1.1))(typescript@5.9.3)
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
 packages:
 
   '@alloc/quick-lru@5.3.0':

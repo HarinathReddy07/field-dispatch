@@ -1,0 +1,27 @@
+{
+  "name": "@dispatch/ui-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "css"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/write-css.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@dispatch/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.9.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.6.3"
+  }
+}

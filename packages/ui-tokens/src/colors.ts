@@ -1,0 +1,61 @@
+export const SEMANTIC_COLORS = [
+  'bg',
+  'surface',
+  'surfaceMuted',
+  'border',
+  'borderStrong',
+  'text',
+  'textMuted',
+  'textSubtle',
+  'primary',
+  'primaryHover',
+  'primarySoft',
+  'onPrimary',
+  'success',
+  'warning',
+  'danger',
+  'focus',
+] as const;
+export type ColorToken = (typeof SEMANTIC_COLORS)[number];
+export type Palette = Record<ColorToken, string>;
+export type ThemeName = 'light' | 'dark';
+
+export const colors: Record<ThemeName, Palette> = {
+  light: {
+    bg: '#F8FAFC',
+    surface: '#FFFFFF',
+    surfaceMuted: '#F1F5F9',
+    border: '#E2E8F0',
+    borderStrong: '#CBD5E1',
+    text: '#0F172A',
+    textMuted: '#475569',
+    textSubtle: '#64748B',
+    primary: '#1D4ED8',
+    primaryHover: '#1E40AF',
+    primarySoft: '#DBEAFE',
+    onPrimary: '#FFFFFF',
+    success: '#15803D',
+    warning: '#B45309',
+    danger: '#B91C1C',
+    focus: '#2563EB',
+  },
+  dark: {
+    bg: '#0B1220',
+    surface: '#111A2C',
+    surfaceMuted: '#18233A',
+    border: '#243049',
+    borderStrong: '#334155',
+    text: '#E5E7EB',
+    textMuted: '#A7B3C6',
+    textSubtle: '#8896AB',
+    primary: '#60A5FA',
+    primaryHover: '#93C5FD',
+    primarySoft: '#172554',
+    onPrimary: '#0B1220',
+    // lightened so they keep AA contrast on the dark surfaces
+    success: '#4ADE80',
+    warning: '#FBBF24',
+    danger: '#F87171',
+    focus: '#93C5FD',
+  },
+};

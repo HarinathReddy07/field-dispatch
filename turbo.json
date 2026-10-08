@@ -9,7 +9,7 @@
     "CONCURRENCY_ITERATIONS"
   ],
   "tasks": {
-    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**"] },
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**", "css/**"] },
     "lint": { "dependsOn": ["^build"] },
     "typecheck": { "dependsOn": ["^build"] },
     "test": { "dependsOn": ["^build"], "cache": false }
