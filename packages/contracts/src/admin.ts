@@ -21,6 +21,8 @@ export interface AdminJobsResponse {
 export interface AdminSummary {
   countsByState: Partial<Record<RequestState, number>>;
   activeRequests: number;
+  /** Settlements recorded since midnight (server time). */
+  completedToday: number;
   activeTechnicians: number;
   exceptionCount: number;
 }

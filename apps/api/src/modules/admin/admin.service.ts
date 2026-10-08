@@ -123,8 +123,11 @@ export class AdminService {
       SELECT count(*)::int AS n FROM technicians
       WHERE availability_status IN ('AVAILABLE', 'BUSY')
         AND last_seen_at >= now() - make_interval(secs => ${this.cfg.LOCATION_FRESHNESS_SECONDS}::float8)`;
+    const done = await this.prisma.$queryRaw<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM settlements WHERE created_at >= date_trunc('day', now())`;
     return {
       countsByState,
+      completedToday: done[0]!.n,
       activeRequests: activeViews.length,
       activeTechnicians: techs[0]!.n,
       exceptionCount: decorated.filter((d) => d.exceptionFlags.length > 0).length,

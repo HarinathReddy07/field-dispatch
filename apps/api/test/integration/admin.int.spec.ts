@@ -123,6 +123,7 @@ describe('A5 authorization and admin operations', () => {
     expect(summary.body.activeRequests).toBeGreaterThanOrEqual(2);
     expect(summary.body.activeTechnicians).toBeGreaterThanOrEqual(1);
     expect(typeof summary.body.exceptionCount).toBe('number');
+    expect(summary.body.completedToday).toBeGreaterThanOrEqual(0);
   });
 
   it('flags stale technicians and overdue reviews on the board', async () => {
