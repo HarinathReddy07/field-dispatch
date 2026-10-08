@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { LiveProvider } from '@/components/live-provider';
 import { Shell } from '@/components/shell';
+import { ToastProvider } from '@/components/ui';
 import { serverApi } from '@/lib/session';
 
 /**
@@ -13,7 +14,9 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
   if (!data || data.role !== 'ADMIN') redirect('/api/session/logout');
   return (
     <LiveProvider>
-      <Shell name={data.name}>{children}</Shell>
+      <ToastProvider>
+        <Shell name={data.name}>{children}</Shell>
+      </ToastProvider>
     </LiveProvider>
   );
 }

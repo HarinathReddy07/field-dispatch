@@ -4,6 +4,8 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly details?: unknown,
+    /** Correlation id from the error envelope; shown (and copyable) in the UI so support can find the request. */
+    readonly correlationId?: string,
   ) {
     super(message);
   }
@@ -31,8 +33,14 @@ export async function api<T>(
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   if (res.status === 401 && typeof window !== 'undefined') window.location.href = '/login';
   if (!res.ok) {
-    const e = (data ?? {}) as { code?: string; message?: string; details?: unknown };
-    throw new ApiError(res.status, e.code ?? 'ERROR', e.message ?? res.statusText, e.details);
+    const e = (data ?? {}) as { code?: string; message?: string; details?: unknown; correlationId?: string };
+    throw new ApiError(
+      res.status,
+      e.code ?? 'ERROR',
+      e.message ?? res.statusText,
+      e.details,
+      e.correlationId ?? res.headers.get('x-correlation-id') ?? undefined,
+    );
   }
   return data as T;
 }

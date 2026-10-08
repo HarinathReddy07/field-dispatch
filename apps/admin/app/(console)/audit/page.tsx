@@ -1,116 +1,196 @@
 'use client';
 
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { AuditResponse } from '@dispatch/contracts';
-import { Button, Card, EmptyState, ErrorState, TableSkeleton } from '@/components/ui';
+import type { AuditResponse, AuditRow } from '@dispatch/contracts';
+import {
+  Button,
+  Card,
+  Column,
+  CopyButton,
+  DataTable,
+  EmptyState,
+  ErrorState,
+  Input,
+  PageHeader,
+  Pagination,
+  TableSkeleton,
+} from '@/components/ui';
 import { useLiveRefresh } from '@/components/live-provider';
 import { useQuery } from '@/hooks/use-query';
+import { useDebounced } from '@/hooks/use-debounced';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PAGE_SIZE = 25;
 
 export default function AuditPage() {
   const [requestId, setRequestId] = useState('');
   const [actorId, setActorId] = useState('');
   const [action, setAction] = useState('');
   const [page, setPage] = useState(1);
+  const [open, setOpen] = useState<number | null>(null);
 
-  const invalid = (requestId && !UUID.test(requestId)) || (actorId && !UUID.test(actorId));
+  // typing in a filter box must not fire a request per keystroke
+  const f = useDebounced({ requestId, actorId, action }, 300);
+  const idError = (v: string) => (v && !UUID.test(v) ? 'Must be a valid UUID; ignored until it is.' : null);
+
   const path = useMemo(() => {
-    const q = new URLSearchParams({ pageSize: '25', page: String(page) });
-    if (requestId && UUID.test(requestId)) q.set('requestId', requestId);
-    if (actorId && UUID.test(actorId)) q.set('actorId', actorId);
-    if (action.trim()) q.set('action', action.trim());
+    const q = new URLSearchParams({ pageSize: String(PAGE_SIZE), page: String(page) });
+    if (f.requestId && UUID.test(f.requestId)) q.set('requestId', f.requestId);
+    if (f.actorId && UUID.test(f.actorId)) q.set('actorId', f.actorId);
+    if (f.action.trim()) q.set('action', f.action.trim());
     return `admin/audit?${q.toString()}`;
-  }, [requestId, actorId, action, page]);
+  }, [f, page]);
 
   const audit = useQuery<AuditResponse>(path);
   useLiveRefresh(audit.refetch);
-  const pages = audit.data ? Math.max(1, Math.ceil(audit.data.total / audit.data.pageSize)) : 1;
-  const reset = () => setPage(1);
+
+  const columns: Column<AuditRow>[] = [
+    {
+      key: 'expand',
+      header: '',
+      className: 'w-8',
+      cell: (a) => (
+        <Button
+          variant="ghost"
+          aria-label={open === a.seq ? 'Hide details' : 'Show details'}
+          aria-expanded={open === a.seq}
+          onClick={() => setOpen(open === a.seq ? null : a.seq)}
+          className="!min-h-7 !px-1"
+        >
+          {open === a.seq ? (
+            <ChevronDown aria-hidden size={16} strokeWidth={1.75} />
+          ) : (
+            <ChevronRight aria-hidden size={16} strokeWidth={1.75} />
+          )}
+        </Button>
+      ),
+    },
+    {
+      key: 'when',
+      header: 'Time',
+      cell: (a) => (
+        <span className="tabular whitespace-nowrap text-muted">
+          {new Date(a.created_at).toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: 'action',
+      header: 'Action',
+      cell: (a) => <span className="font-mono text-xs font-medium">{a.action}</span>,
+    },
+    {
+      key: 'actor',
+      header: 'Actor',
+      cell: (a) => <span className="capitalize">{a.actor_role.toLowerCase()}</span>,
+    },
+    {
+      key: 'entity',
+      header: 'Entity',
+      cell: (a) => (
+        <span className="text-xs text-muted">
+          {a.entity_type} <span className="font-mono">{a.entity_id.slice(0, 8)}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'reason',
+      header: 'Reason',
+      cell: (a) => (typeof a.metadata?.reason === 'string' ? a.metadata.reason : ''),
+    },
+    {
+      key: 'corr',
+      header: 'Correlation',
+      cell: (a) =>
+        a.correlation_id ? (
+          <span className="flex items-center gap-1">
+            <span className="font-mono text-xs text-muted">{a.correlation_id.slice(0, 8)}</span>
+            <CopyButton value={a.correlation_id} label="Copy correlation id" compact />
+          </span>
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+    },
+  ];
+
+  const items = audit.data?.items ?? [];
+  const expanded = items.find((a) => a.seq === open);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Audit log</h1>
+    <div className="space-y-4">
+      <PageHeader
+        title="Audit log"
+        description="Append-only record of every state change and privileged action."
+      />
+
       <Card title="Filters">
         <div className="grid gap-3 sm:grid-cols-3">
-          {[
-            ['Job ID', requestId, setRequestId, 'uuid'],
-            ['Actor ID', actorId, setActorId, 'uuid'],
-            ['Action', action, setAction, 'e.g. request.admin_cancel'],
-          ].map(([label, value, set, ph]) => (
-            <label key={label as string} className="text-sm">
-              <span className="font-medium">{label as string}</span>
-              <input
-                value={value as string}
-                onChange={(e) => {
-                  (set as (v: string) => void)(e.target.value);
-                  reset();
-                }}
-                placeholder={ph as string}
-                className="mt-1 min-h-10 w-full rounded-md border border-line bg-surface px-2"
-              />
-            </label>
-          ))}
+          <Input
+            label="Job ID"
+            value={requestId}
+            placeholder="uuid"
+            error={idError(requestId)}
+            onChange={(e) => {
+              setRequestId(e.target.value.trim());
+              setPage(1);
+            }}
+          />
+          <Input
+            label="Actor ID"
+            value={actorId}
+            placeholder="uuid"
+            error={idError(actorId)}
+            onChange={(e) => {
+              setActorId(e.target.value.trim());
+              setPage(1);
+            }}
+          />
+          <Input
+            label="Action"
+            value={action}
+            placeholder="e.g. request.admin_cancel"
+            onChange={(e) => {
+              setAction(e.target.value);
+              setPage(1);
+            }}
+          />
         </div>
-        {invalid && (
-          <p role="alert" className="mt-2 text-sm text-[var(--tone-bad-ink)]">
-            Job and actor IDs must be valid UUIDs; invalid filters are ignored.
-          </p>
-        )}
       </Card>
 
-      {audit.error && <ErrorState message={audit.error.message} onRetry={audit.refetch} />}
-      <Card title={`Entries${audit.data ? ` (${audit.data.total})` : ''}`}>
+      {audit.error && (
+        <ErrorState
+          message={audit.error.message}
+          correlationId={audit.error.correlationId}
+          onRetry={audit.refetch}
+        />
+      )}
+      <Card title={`Entries${audit.data ? ` (${audit.data.total})` : ''}`} bodyClassName="p-0">
         {audit.loading && !audit.data ? (
-          <TableSkeleton cols={5} />
-        ) : (audit.data?.items ?? []).length === 0 ? (
-          <EmptyState title="No matching audit entries" />
+          <TableSkeleton cols={6} />
+        ) : items.length === 0 ? (
+          <EmptyState title="No matching audit entries" hint="Try a different job, actor or action." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm" data-testid="audit-table">
-              <thead className="text-xs uppercase tracking-wide text-soft">
-                <tr>
-                  <th className="py-2 pr-3">When</th>
-                  <th className="pr-3">Action</th>
-                  <th className="pr-3">Actor</th>
-                  <th className="pr-3">Entity</th>
-                  <th className="pr-3">Reason / details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {audit.data!.items.map((a) => (
-                  <tr key={a.seq}>
-                    <td className="py-2 pr-3 whitespace-nowrap text-soft">
-                      {new Date(a.created_at).toLocaleString()}
-                    </td>
-                    <td className="pr-3 font-mono text-xs">{a.action}</td>
-                    <td className="pr-3">{a.actor_role.toLowerCase()}</td>
-                    <td className="pr-3 text-xs text-soft">
-                      {a.entity_type}
-                      <br />
-                      <span className="font-mono">{a.entity_id.slice(0, 8)}</span>
-                    </td>
-                    <td className="pr-3">
-                      {typeof a.metadata?.reason === 'string' ? a.metadata.reason : ''}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <DataTable
+            ariaLabel="Audit entries"
+            testId="audit-table"
+            columns={columns}
+            rows={items}
+            rowKey={(a) => String(a.seq)}
+            selectedKey={open === null ? null : String(open)}
+            minWidth={900}
+          />
+        )}
+        {expanded && (
+          <div className="border-t border-line bg-surface-muted px-4 py-3">
+            <p className="mb-1 text-xs font-medium text-muted">Metadata (read-only)</p>
+            <pre className="max-h-60 overflow-auto font-mono text-xs whitespace-pre-wrap">
+              {JSON.stringify(expanded.metadata, null, 2)}
+            </pre>
           </div>
         )}
-        {audit.data && pages > 1 && (
-          <nav aria-label="Pagination" className="mt-4 flex items-center justify-end gap-3 text-sm">
-            <Button disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              Previous
-            </Button>
-            <span>
-              Page {page} of {pages}
-            </span>
-            <Button disabled={page >= pages} onClick={() => setPage(page + 1)}>
-              Next
-            </Button>
-          </nav>
+        {audit.data && (
+          <Pagination page={page} pageSize={PAGE_SIZE} total={audit.data.total} onPage={setPage} />
         )}
       </Card>
     </div>

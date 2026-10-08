@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui';
+import { Button, Input } from '@/components/ui';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function LoginPage() {
         setError(body.message ?? 'Sign-in failed');
         return;
       }
-      router.replace('/');
+      router.replace('/dashboard');
       router.refresh();
     } catch {
       setError('Network error. Check your connection and try again.');
@@ -37,51 +37,54 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <form
         onSubmit={submit}
-        className="w-full max-w-sm space-y-4 rounded-xl border border-line bg-surface p-6 shadow-sm"
+        noValidate={false}
+        className="w-full max-w-sm space-y-5 rounded-lg border border-line bg-surface p-6"
       >
-        <div>
-          <h1 className="text-xl font-semibold">Dispatch Operations</h1>
-          <p className="text-sm text-soft">Admin sign-in</p>
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden
+            className="flex h-9 w-9 items-center justify-center rounded-sm bg-primary text-base font-bold text-on-primary"
+          >
+            D
+          </span>
+          <div>
+            <h1 className="text-lg leading-6 font-semibold">Dispatch Operations</h1>
+            <p className="text-sm text-muted">Admin sign-in</p>
+          </div>
         </div>
-        <div className="space-y-1">
-          <label htmlFor="email" className="text-sm font-medium">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="username"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="min-h-10 w-full rounded-md border border-line bg-surface px-3"
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="password" className="text-sm font-medium">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="min-h-10 w-full rounded-md border border-line bg-surface px-3"
-          />
-        </div>
+
+        <Input
+          label="Email"
+          type="email"
+          autoComplete="username"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <Input
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
         {error && (
-          <p role="alert" className="text-sm text-[var(--tone-bad-ink)]">
+          <p role="alert" className="rounded-sm border border-danger/40 px-3 py-2 text-sm text-danger">
             {error}
           </p>
         )}
-        <Button type="submit" variant="primary" disabled={busy} className="w-full">
+
+        <Button type="submit" variant="primary" size="lg" loading={busy} className="w-full">
           {busy ? 'Signing in…' : 'Sign in'}
         </Button>
+        <p className="text-center text-xs text-muted">
+          Operations staff only. Access is recorded in the audit log.
+        </p>
       </form>
     </main>
   );

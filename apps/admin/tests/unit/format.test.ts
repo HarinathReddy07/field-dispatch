@@ -1,13 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  STATE_TONE,
-  elapsedSeconds,
-  formatDuration,
-  formatMoney,
-  haversineKm,
-  timeAgo,
-} from '../../lib/format.ts';
+import { elapsedSeconds, formatDuration, formatMoney, haversineKm, timeAgo } from '../../lib/format.ts';
 import { jwtExpiry } from '../../lib/jwt.ts';
 
 test('elapsed time follows server timestamps, not the client clock', () => {
@@ -27,8 +20,9 @@ test('formatDuration', () => {
   assert.equal(formatDuration(3725), '1:02:05');
 });
 
-test('formatMoney uses minor units', () => {
-  assert.match(formatMoney(52500), /525\.00/);
+test('formatMoney uses minor units with Indian grouping', () => {
+  assert.equal(formatMoney(52500), '₹525.00');
+  assert.equal(formatMoney(12345678), '₹1,23,456.78');
   assert.equal(formatMoney(null), '—');
 });
 
@@ -44,25 +38,6 @@ test('timeAgo buckets', () => {
   assert.equal(timeAgo('2030-01-01T11:59:58Z', now), 'just now');
   assert.equal(timeAgo('2030-01-01T11:59:00Z', now), '1m ago');
   assert.equal(timeAgo('2030-01-01T09:00:00Z', now), '3h ago');
-});
-
-test('every request state has a badge tone', () => {
-  for (const s of [
-    'DRAFT',
-    'REQUESTED',
-    'MATCHED',
-    'CONFIRMED',
-    'ARRIVED',
-    'IN_PROGRESS',
-    'PROOF_UPLOADED',
-    'UNDER_REVIEW',
-    'REWORK',
-    'COMPLETED',
-    'SETTLED',
-    'CANCELLED',
-  ]) {
-    assert.ok(STATE_TONE[s], s);
-  }
 });
 
 test('jwtExpiry reads exp without verifying', () => {

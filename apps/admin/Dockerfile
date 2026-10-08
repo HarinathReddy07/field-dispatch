@@ -5,6 +5,7 @@ WORKDIR /repo
 COPY . .
 RUN pnpm install --frozen-lockfile \
   && pnpm --filter @dispatch/contracts build \
+  && pnpm --filter @dispatch/ui-tokens build \
   && pnpm --filter @dispatch/admin build
 ENV NODE_ENV=production
 WORKDIR /repo/apps/admin
