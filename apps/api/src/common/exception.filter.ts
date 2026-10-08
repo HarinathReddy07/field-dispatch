@@ -62,6 +62,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
+    // Requests outside /api/v1 (typos, browsers probing, bad base URLs) bypass the request logger, so a user who
+    // reports a correlation id from a bare 404 could not be traced. Log those here, once, without query strings.
+    if (status === 404 && !req.path.startsWith('/api/v1') && req.path !== '/favicon.ico') {
+      this.logger.warn({ correlationId, method: req.method, path: req.path }, 'Unmatched route');
+    }
+
     const body: ErrorEnvelope = {
       code,
       message,
