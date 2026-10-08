@@ -31,3 +31,25 @@ export async function refreshTechnicianLocations(): Promise<void> {
     await ctx.dispose();
   }
 }
+
+/**
+ * Earlier QA runs leave confirmed jobs behind (assets `UI-…` / `E2E-…`), which keeps technicians busy and starves the next run.
+ * Cancels only those suite-created jobs through the real admin API (with a reason, so it is audited); demo data is never touched.
+ */
+export async function cancelLeftoverTestJobs(): Promise<number> {
+  const admin = await apiLogin('admin@dispatch.test');
+  const headers = { Authorization: `Bearer ${admin.token}` };
+  const res = await admin.ctx.get(`${API}/admin/jobs?pageSize=100`, { headers });
+  const items = ((await res.json()).items ?? []) as { id: string; assetId: string; state: string }[];
+  let cancelled = 0;
+  for (const j of items) {
+    if (!/^(UI|E2E)-/.test(j.assetId) || ['SETTLED', 'CANCELLED'].includes(j.state)) continue;
+    const r = await admin.ctx.post(`${API}/admin/jobs/${j.id}/cancel`, {
+      headers,
+      data: { reason: 'QA cleanup of a leftover test job' },
+    });
+    if (r.ok()) cancelled++;
+  }
+  await admin.ctx.dispose();
+  return cancelled;
+}

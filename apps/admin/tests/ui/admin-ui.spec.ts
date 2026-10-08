@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
-import { API, PASSWORD, apiLogin, refreshTechnicianLocations } from '../helpers';
+import { API, PASSWORD, apiLogin, cancelLeftoverTestJobs, refreshTechnicianLocations } from '../helpers';
 
 /**
  * Accessibility and keyboard QA against a RUNNING stack (see docs/runbook.md): axe on every page in light and dark,
@@ -49,6 +49,7 @@ test.beforeAll(async ({ browser }) => {
   await ctx.storageState({ path: STATE_FILE });
   await ctx.close();
 
+  await cancelLeftoverTestJobs();
   await refreshTechnicianLocations();
 
   // data for the screenshots: a CONFIRMED job (technician on the map) and the seeded SETTLED job

@@ -1,5 +1,5 @@
 import { expect, request as pwRequest, test, type Page } from '@playwright/test';
-import { API, PASSWORD, apiLogin, refreshTechnicianLocations } from '../helpers';
+import { API, PASSWORD, apiLogin, cancelLeftoverTestJobs, refreshTechnicianLocations } from '../helpers';
 
 async function signIn(page: Page) {
   await page.goto('/login');
@@ -34,6 +34,7 @@ test('live board: a new job and its transitions appear without reloading; cancel
   await expect(page.getByTestId('jobs-table')).toBeVisible();
 
   // --- API-triggered transitions (as the requester) ---
+  await cancelLeftoverTestJobs();
   await refreshTechnicianLocations();
   const asset = `E2E-${Date.now()}`;
   const requester = { Authorization: `Bearer ${(await apiLogin('requester1@dispatch.test')).token}` };
