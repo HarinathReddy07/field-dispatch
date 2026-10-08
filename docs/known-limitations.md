@@ -1,6 +1,6 @@
 # Known limitations (honest list)
 
-## Mocked on purpose (out of scope per BUILD_SPEC §1)
+## Mocked on purpose (out of scope per the requirement spec §1)
 
 | Mock                                    | Where                                                                                        | Real replacement                         |
 | --------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------- |

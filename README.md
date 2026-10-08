@@ -11,7 +11,7 @@ with concurrency protection, an audit trail and an operations console.
 | Mobile (Requester + Technician) | React Native (Expo), TanStack Query, Zustand, socket.io-client, expo-secure-store                           | `apps/mobile`        |
 | Shared contracts                | zod DTOs, enums, state machine table, error codes, socket events                                            | `packages/contracts` |
 
-Docs: [architecture](docs/architecture.md) · [API](docs/api.md) · [test plan](docs/test-plan.md) · [runbook](docs/runbook.md) · [demo script](docs/demo-script.md) · [known limitations](docs/known-limitations.md) · [ADRs](docs/adr) · requirements [`BUILD_SPEC.md`](BUILD_SPEC.md) · status [`PROGRESS.md`](PROGRESS.md).
+Docs: [architecture](docs/architecture.md) · [API](docs/api.md) · [test plan](docs/test-plan.md) · [runbook](docs/runbook.md) · [demo script](docs/demo-script.md) · [known limitations](docs/known-limitations.md) · [ADRs](docs/adr) · [status: done / still to do](docs/STATUS.md).
 
 ## Quickstart (Docker)
 
@@ -89,4 +89,4 @@ $ cd apps/mobile && npx expo export --platform android
 Android Bundled (958 modules)  ->  index-….hbc (2.4MB)
 ```
 
-Counts are refreshed in [`PROGRESS.md`](PROGRESS.md) after each slice.
+Counts are refreshed in [`docs/STATUS.md`](docs/STATUS.md) after each slice.

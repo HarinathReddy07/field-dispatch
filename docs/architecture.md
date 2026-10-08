@@ -1,7 +1,7 @@
 # Architecture
 
 Field Asset Inspection & Repair Dispatch: a vertical slice of a real-time, location-aware, multi-role platform.
-Requirements: [`BUILD_SPEC.md`](../BUILD_SPEC.md) (condensed client spec). Status: [`PROGRESS.md`](../PROGRESS.md).
+Requirements: [`docs/spec/SPEC.md`](spec/SPEC.md) (client spec) with the state-machine decision in [ADR 0006](adr/0006-spec-state-machine.md). Status: [`STATUS.md`](STATUS.md).
 
 ## Context
 
@@ -37,7 +37,7 @@ flowchart LR
 Layering: controller (DTOs only) → service (transaction + orchestration) → domain (pure rules) → SQL. The state machine itself is
 a pure table in `packages/contracts` shared by API, admin and mobile.
 
-## State machine (BUILD_SPEC §2)
+## State machine (requirement spec §2)
 
 Single table: [`packages/contracts/src/state-machine.ts`](../packages/contracts/src/state-machine.ts). Illegal transition → `409 ILLEGAL_TRANSITION`.
 Every accepted transition writes a `job_events` row and an `audit_logs` row **in the same transaction**, and queues a `request.state.changed` outbox event.
@@ -121,7 +121,7 @@ Migrations: [`infra/migrations`](../infra/migrations). Highlights: `geography(Po
 - Technician location samples go to Redis (latest + TTL) and are persisted to Postgres at most every `LOCATION_PERSIST_INTERVAL_SECONDS`; only authorized viewers receive `technician.location.updated`.
 - Access tokens expire on live sockets: the server disconnects, the client reconnects with a fresh token.
 
-## Assumptions (BUILD_SPEC rule 7)
+## Assumptions
 
 1. `CANCELLED` is an added terminal state: the spec's diagram has no terminal for requester cancellation before a booking or for admin cancellation.
 2. `POST /requests` creates a `DRAFT` and submits it in the same transaction (two events); `PATCH /requests/:id` is `REQUESTED → DRAFT → REQUESTED`.

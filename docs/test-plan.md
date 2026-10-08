@@ -16,7 +16,7 @@ Each integration suite creates its own migrated, seeded database, so suites are 
 | Admin Playwright smoke                               | `pnpm --filter @dispatch/admin test:smoke`          | running API + admin + seeded DB (`make demo`)         |
 | Mobile unit + component tests                        | `pnpm --filter @dispatch/mobile test`               | –                                                     |
 
-## Required test levels (BUILD_SPEC §9)
+## Required test levels (requirement spec §9)
 
 | Level                                                             | Where                                                                                             |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
@@ -44,7 +44,7 @@ Each integration suite creates its own migrated, seeded database, so suites are 
 | A6  | Repeated finalization → exactly one settlement                                         | `settlement.int` (20 parallel approvals, 20 same-key retries, sweeper race)                                                                         |
 | A7  | API restart mid-flow                                                                   | `restart.int` (state, OTP, token validity survive; sweeper resumes). Container kill/restart: `docker compose restart api` during the demo (runbook) |
 
-## Security matrix (BUILD_SPEC §9)
+## Security matrix (requirement spec §9)
 
 | Risk                                   | Test                                                                             | Result expected                                                        |
 | -------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -74,7 +74,7 @@ Each integration suite creates its own migrated, seeded database, so suites are 
 | admin Playwright smoke (against a locally running API + admin + seeded DB) | 2 passed                                                                   |
 | `expo export --platform android`                                           | Hermes bundle builds                                                       |
 
-Recorded in [`PROGRESS.md`](../PROGRESS.md) after each slice. The CI workflow runs the same suites with `postgis/postgis:16-3.4` and `redis:7` service containers.
+Recorded in [`STATUS.md`](STATUS.md) after each slice. The CI workflow runs the same suites with `postgis/postgis:16-3.4` and `redis:7` service containers.
 
 ## Not yet covered by automation
 
