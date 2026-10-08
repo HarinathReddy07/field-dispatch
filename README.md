@@ -77,14 +77,11 @@ Seeded 12 users (8 technicians). Demo password: see README.
 $ curl -s http://127.0.0.1:3000/health/ready
 {"status":"ok","checks":{"database":true,"redis":true}}
 $ pnpm test                                   # whole monorepo
-  admin 7 · contracts 776 · mobile 44 · api 142 (15 suites)        all pass
-$ pnpm --filter @dispatch/api test:e2e         # make e2e: A1-A7 + realtime
-Test Suites: 8 passed, 8 total
-Tests:       78 passed, 78 total
+  admin 6 · contracts 776 · ui-tokens 60 · mobile 44 · api 146 (16 suites)        all pass
+$ pnpm --filter @dispatch/api test:e2e         # make e2e: A1-A7 + realtime (8 of the 16 API suites, run in isolation)
 $ cd apps/admin && npx playwright test         # against the running API + admin
-  ok 1 only admins can sign in; protected pages redirect to login
-  ok 2 live board: a new job and its transitions appear without reloading; cancel needs a reason and is audited
-  2 passed
+  smoke 2 (login gate; live board + reason-gated cancel + audit) · axe 4 (light/dark × desktop/phone) · keyboard 1 · reassign gate 1
+  8 passed
 $ cd apps/mobile && npx expo export --platform android
 Android Bundled (958 modules)  ->  index-….hbc (2.4MB)
 ```

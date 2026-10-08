@@ -65,14 +65,14 @@ Each integration suite creates its own migrated, seeded database, so suites are 
 
 ## Results (last full run on the author's machine: no Docker; PostgreSQL 16.4 + PostGIS 3.6, Redis 5)
 
-| Suite                                                                      | Result                                                                     |
-| -------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `pnpm lint`, `pnpm typecheck`                                              | clean                                                                      |
-| `pnpm test`                                                                | admin 7 · contracts 776 · mobile 44 · API 142 tests in 15 suites: all pass |
-| `make e2e` (A1-A7 + realtime)                                              | 8 suites / 78 tests pass                                                   |
-| coverage (`test:cov`)                                                      | domain 100 %, dispatch 98.4 % lines (gate 90 %)                            |
-| admin Playwright smoke (against a locally running API + admin + seeded DB) | 2 passed                                                                   |
-| `expo export --platform android`                                           | Hermes bundle builds                                                       |
+| Suite                                                                      | Result                                                                                    |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `pnpm lint`, `pnpm typecheck`                                              | clean                                                                                     |
+| `pnpm test`                                                                | admin 6 · contracts 776 · ui-tokens 60 · mobile 44 · API 146 tests in 16 suites: all pass |
+| `make e2e` (A1-A7 + realtime)                                              | 8 suites (subset of the 16 API suites) pass                                               |
+| coverage (`test:cov`)                                                      | domain 100 %, dispatch 98.4 % lines (gate 90 %)                                           |
+| admin Playwright smoke (against a locally running API + admin + seeded DB) | 8 passed                                                                                  |
+| `expo export --platform android`                                           | Hermes bundle builds                                                                      |
 
 Recorded in [`STATUS.md`](STATUS.md) after each slice. The CI workflow runs the same suites with `postgis/postgis:16-3.4` and `redis:7` service containers.
 
