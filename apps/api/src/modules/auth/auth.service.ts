@@ -7,7 +7,7 @@ import { AppException } from '../../common/app-exception';
 import { AuthUser } from '../../common/decorators';
 import { APP_CONFIG } from '../../config/config.module';
 import { sha256Hex } from '../../domain/hash';
-import { AuditService } from '../../infra/audit.service';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../../infra/prisma.service';
 import { dummyHash, verifyPassword } from './password';
 

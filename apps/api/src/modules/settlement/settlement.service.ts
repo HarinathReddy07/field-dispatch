@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { rooms } from '@dispatch/contracts';
-import { AuditService } from '../../infra/audit.service';
+import { AuditService } from '../audit/audit.service';
 import { OutboxService } from '../../infra/outbox.service';
 import { Tx } from '../../infra/prisma.service';
 import { PAYMENT_PROVIDER, PaymentProvider } from './payment/payment.provider';

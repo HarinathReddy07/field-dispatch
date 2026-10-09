@@ -6,15 +6,15 @@ import { AppException } from '../../common/app-exception';
 import { AuthUser } from '../../common/decorators';
 import { APP_CONFIG } from '../../config/config.module';
 import { REQUIRED_EVIDENCE_COUNT } from '../../domain/media';
-import { AuditService } from '../../infra/audit.service';
+import { AuditService } from '../audit/audit.service';
 import { IdempotencyService } from '../../infra/idempotency.service';
 import { OutboxService } from '../../infra/outbox.service';
 import { PrismaService, Tx } from '../../infra/prisma.service';
 import { lockRequest } from '../../infra/request-sql';
 import { TransitionService } from '../../infra/transition.service';
 import { RequestsRepository } from '../requests/requests.repository';
-import { AssignmentsService } from './assignments.service';
-import { SettlementService } from './settlement.service';
+import { AssignmentsService } from '../dispatch/assignments.service';
+import { SettlementService } from '../settlement/settlement.service';
 
 type Actor = { id: string | null; role: 'REQUESTER' | 'TECHNICIAN' | 'SYSTEM' };
 

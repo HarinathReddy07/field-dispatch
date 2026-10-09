@@ -7,13 +7,13 @@ import { AuthUser } from '../../common/decorators';
 import { APP_CONFIG } from '../../config/config.module';
 import { computeExceptionFlags } from '../../domain/exceptions';
 import { calculateQuote, metersToKm } from '../../domain/pricing';
-import { AuditService } from '../../infra/audit.service';
+import { AuditService } from '../audit/audit.service';
 import { OutboxService } from '../../infra/outbox.service';
 import { PrismaService, Tx, pgCode } from '../../infra/prisma.service';
 import { lockRequest } from '../../infra/request-sql';
 import { TransitionService } from '../../infra/transition.service';
-import { AssignmentsService } from '../jobs/assignments.service';
-import { MediaService } from '../jobs/media.service';
+import { AssignmentsService } from '../dispatch/assignments.service';
+import { MediaService } from '../media/media.service';
 import { RequestsRepository } from '../requests/requests.repository';
 
 const ACTIVE_STATES: RequestState[] = [

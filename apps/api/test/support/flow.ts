@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { STORAGE_PROVIDER } from '../../src/modules/jobs/storage/storage.provider';
-import { MemoryStorageProvider } from '../../src/modules/jobs/storage/memory.storage';
+import { STORAGE_PROVIDER } from '../../src/modules/media/storage/storage.provider';
+import { MemoryStorageProvider } from '../../src/modules/media/storage/memory.storage';
 import { ACCOUNTS, TECH_ID, TestCtx, newRequestBody } from './app';
 
 const API = '/api/v1';

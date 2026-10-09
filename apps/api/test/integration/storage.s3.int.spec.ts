@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { loadEnv } from '@dispatch/config';
-import { MinioStorageProvider } from '../../src/modules/jobs/storage/minio.storage';
+import { MinioStorageProvider } from '../../src/modules/media/storage/minio.storage';
 import { TestCtx, createTestApp } from '../support/app';
 import { Flow } from '../support/flow';
 import { S3Server, startS3Server } from '../support/s3';

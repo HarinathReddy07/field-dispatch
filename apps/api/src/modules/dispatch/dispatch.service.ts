@@ -7,13 +7,13 @@ import { AuthUser } from '../../common/decorators';
 import { APP_CONFIG } from '../../config/config.module';
 import { calculateQuote, metersToKm } from '../../domain/pricing';
 import { Candidate, rankCandidates, toNearby } from '../../domain/ranking';
-import { AuditService } from '../../infra/audit.service';
+import { AuditService } from '../audit/audit.service';
 import { IdempotencyService } from '../../infra/idempotency.service';
 import { OutboxService } from '../../infra/outbox.service';
 import { PrismaService, Tx, pgCode } from '../../infra/prisma.service';
 import { lockRequest } from '../../infra/request-sql';
 import { TransitionService } from '../../infra/transition.service';
-import { RequestsRepository } from './requests.repository';
+import { RequestsRepository } from '../requests/requests.repository';
 
 interface CandidateRow {
   technician_id: string;

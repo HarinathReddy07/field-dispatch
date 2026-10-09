@@ -1,25 +1,14 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
-import { AuthUser, CurrentUser, IdempotencyKey, Roles } from '../../common/decorators';
-import {
-  ConfirmBody,
-  CreateRequestBody,
-  HistoryQueryDto,
-  UpdateRequestBody,
-  NearbyQueryDto,
-  SnapshotQueryDto,
-} from '../../common/dtos';
-import { DispatchService } from './dispatch.service';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { AuthUser, CurrentUser, Roles } from '../../common/decorators';
+import { CreateRequestBody, HistoryQueryDto, SnapshotQueryDto, UpdateRequestBody } from '../../common/dtos';
 import { RequestsService } from './requests.service';
 
 @ApiTags('requests')
 @ApiBearerAuth()
 @Controller('requests')
 export class RequestsController {
-  constructor(
-    private readonly requests: RequestsService,
-    private readonly dispatch: DispatchService,
-  ) {}
+  constructor(private readonly requests: RequestsService) {}
 
   @Roles('REQUESTER')
   @Post()
@@ -64,29 +53,6 @@ export class RequestsController {
     @Query() query: SnapshotQueryDto,
   ) {
     return this.requests.snapshot(user, id, query.since ?? 0);
-  }
-
-  @Roles('REQUESTER')
-  @Get(':id/nearby-technicians')
-  nearby(
-    @CurrentUser() user: AuthUser,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query() query: NearbyQueryDto,
-  ) {
-    return this.dispatch.nearby(user, id, query);
-  }
-
-  @Roles('REQUESTER')
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
-  @Post(':id/confirm')
-  @HttpCode(200)
-  confirm(
-    @CurrentUser() user: AuthUser,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: ConfirmBody,
-    @IdempotencyKey() key: string,
-  ) {
-    return this.dispatch.confirm(user, id, body.technicianId, key);
   }
 
   @Roles('REQUESTER')

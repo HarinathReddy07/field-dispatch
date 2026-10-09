@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { currentCorrelationId } from '../common/context';
-import { Db } from './prisma.service';
+import { currentCorrelationId } from '../../common/context';
+import { Db } from '../../infra/prisma.service';
 
 export interface AuditEntry {
   actorId: string | null;

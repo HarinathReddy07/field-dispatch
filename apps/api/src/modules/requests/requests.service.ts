@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { CreateRequestDto, RequestView, UpdateRequestDto, rooms } from '@dispatch/contracts';
 import { AppException } from '../../common/app-exception';
 import { AuthUser } from '../../common/decorators';
-import { AuditService } from '../../infra/audit.service';
+import { AuditService } from '../audit/audit.service';
 import { OutboxService } from '../../infra/outbox.service';
 import { PrismaService, Tx } from '../../infra/prisma.service';
 import { lockRequest } from '../../infra/request-sql';

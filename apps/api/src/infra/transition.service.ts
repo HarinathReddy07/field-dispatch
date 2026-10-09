@@ -10,7 +10,7 @@ import {
 } from '@dispatch/contracts';
 import { AppException } from '../common/app-exception';
 import { currentCorrelationId } from '../common/context';
-import { AuditService } from './audit.service';
+import { AuditService } from '../modules/audit/audit.service';
 import { OutboxService } from './outbox.service';
 import { Tx } from './prisma.service';
 import { RequestRow, lockRequest } from './request-sql';

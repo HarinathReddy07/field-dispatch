@@ -3,8 +3,8 @@ import { ApiBearerAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
 import { AuthUser, CurrentUser, IdempotencyKey, Roles, Throttle } from '../../common/decorators';
 import { ArriveBody, EvidenceFinalizeBody, EvidenceIntentBody, ReviewBody } from '../../common/dtos';
 import { JobsService } from './jobs.service';
-import { MediaService } from './media.service';
-import { OtpService } from './otp.service';
+import { MediaService } from '../media/media.service';
+import { OtpService } from '../otp/otp.service';
 
 @ApiTags('jobs')
 @ApiBearerAuth()
