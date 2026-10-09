@@ -70,7 +70,10 @@ export class AccessGuard implements CanActivate {
       }
     } catch (e) {
       if (e instanceof AppException) throw e;
-      // Redis unavailable: fail open for generic traffic; OTP attempts are still bounded in the database.
+      // Redis unavailable. Credential-guessing surfaces (login, OTP arrival) FAIL CLOSED: no counter, no attempt.
+      // Generic traffic fails open so a cache outage does not take the whole API down; OTP attempts are
+      // additionally bounded in the database, which does not depend on Redis.
+      if (bucket === 'login' || bucket === 'arrive') throw new AppException('SERVICE_UNAVAILABLE');
     }
   }
 }
