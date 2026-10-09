@@ -20,7 +20,6 @@ jest.mock(
   () => require('react-native-safe-area-context/jest/mock').default,
 );
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const hooks = require('../../api/hooks') as { useActive: jest.Mock; useAvailability: jest.Mock };
 
 const job = (over: Partial<RequestView> = {}): RequestView =>

@@ -191,7 +191,6 @@ describe('migrations: constraints reject violations', () => {
   });
 
   it('migration runner is idempotent', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { migrate } = require('../../../../infra/scripts/migrate.js');
     expect(await migrate(db.url)).toEqual([]);
   });

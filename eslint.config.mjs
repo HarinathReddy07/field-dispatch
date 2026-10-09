@@ -3,14 +3,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: [
-      '**/dist/**',
-      '**/.next/**',
-      '**/node_modules/**',
-      'apps/mobile/**',
-      '**/coverage/**',
-      '**/*.config.*',
-    ],
+    ignores: ['**/dist/**', '**/.next/**', '**/node_modules/**', '**/coverage/**', '**/*.config.*'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -35,6 +28,11 @@ export default tseslint.config(
         globalThis: 'readonly',
       },
     },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+  {
+    // jest.mock() factories must use require(): the factory runs before ES imports are evaluated.
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts'],
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
   {

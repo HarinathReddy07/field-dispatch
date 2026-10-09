@@ -15,7 +15,6 @@ jest.mock(
   () => require('react-native-safe-area-context/jest/mock').default,
 );
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const hooks = require('../../api/hooks') as { useCreateRequest: jest.Mock };
 const route = { key: 'k', name: 'CreateRequest' } as never;
 

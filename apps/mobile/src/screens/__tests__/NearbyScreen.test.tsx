@@ -15,7 +15,6 @@ jest.mock(
   () => require('react-native-safe-area-context/jest/mock').default,
 );
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const hooks = require('../../api/hooks') as { useNearby: jest.Mock; useConfirm: jest.Mock };
 const route = { key: 'k', name: 'Nearby', params: { requestId: 'r1' } } as never;
 

@@ -5,7 +5,6 @@ import { CATEGORY_RATES_MINOR, CategorySchema } from '@dispatch/contracts';
 const CATEGORIES = CategorySchema.options;
 import { TestCtx, createTestApp, ids } from '../support/app';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { seed } = require('../../../../infra/seed/seed.js') as { seed: (url: string) => Promise<unknown> };
 
 /** Appendix A: the seed data contract, verified against a database seeded exactly the way `make seed` does it. */
