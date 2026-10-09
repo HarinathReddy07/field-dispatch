@@ -20,3 +20,10 @@ overrides:
   multer: ^2.3.0
   body-parser: ^1.20.6
   qs: ^6.16.0
+# Advisories with NO patched release, reachable only through the Expo/Metro developer toolchain of apps/mobile
+# (dev machine / CI bundling), never in the API or admin runtime or the compiled app. Reviewed 2026-10-09; see
+# docs/known-limitations.md. Re-check on every Expo upgrade and remove an entry as soon as a fix ships.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-86w9-cpqp-85rv # node-forge <= 1.4.0 (expo CLI tooling)
+    - GHSA-vfj7-8cjw-p6xm # braces <= 3.0.3 (metro file watching)

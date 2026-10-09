@@ -20,7 +20,10 @@ The author's machine had **no Docker** (and no WSL). Everything below was theref
 
 ## Technical limitations
 
-- **Dependency advisories:** 3 moderate advisories remain in transitive dependencies of NestJS 10 (`@nestjs/core`, `file-type`); fixing them means moving to NestJS 11. High-severity advisories were fixed through `pnpm.overrides` (multer, lodash, js-yaml, qs, body-parser).
+- **Dependency advisories** (`pnpm audit --prod`, 2026-10-09): **0 high or critical are open without a documented reason.** Two high advisories have **no patched release** upstream
+  (`node-forge <= 1.4.0`, `braces <= 3.0.3`); both are reachable only through the Expo CLI / Metro developer toolchain of `apps/mobile` (bundling on a developer machine or CI), not through the API or
+  admin runtime or the compiled app, and are listed with that justification under `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml` so a _new_ high advisory still fails CI. Four moderate advisories remain
+  (`file-type` and `@nestjs/core` inside NestJS 10, fixed by moving to NestJS 11; `uuid` inside Expo tooling). Earlier highs were fixed through `pnpm.overrides` (multer, lodash, js-yaml, qs, body-parser).
 - **Data retention:** `idempotency_keys`, `outbox_events` (published rows) and `refresh_tokens` are never purged; a production system needs a retention job.
 - **Outbox ordering:** events get a sequence number at insert time but can commit out of order; clients order by `seq` and always refetch REST state, so state is never wrong, only briefly stale.
 - **Concurrent refresh:** two simultaneous refreshes with the same token are treated as token reuse and revoke the family (strict by design; the mobile client single-flights refresh).
