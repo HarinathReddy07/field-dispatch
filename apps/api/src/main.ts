@@ -13,9 +13,14 @@ async function main(): Promise<void> {
     bodyParser: false,
   });
   app.useLogger(app.get(Logger));
+  app.enableShutdownHooks(); // SIGTERM/SIGINT: stop accepting, drain, close sockets, Redis and Prisma
   await configureApp(app, env);
   await app.listen(env.PORT, '0.0.0.0');
-  app.get(Logger).log(`API listening on :${env.PORT}`);
+  const log = app.get(Logger);
+  log.log(`API listening on :${env.PORT}`);
+  if (env.INSECURE_LOCAL_DEV) {
+    log.warn('INSECURE_LOCAL_DEV=true: plain HTTP/WS is accepted. Never use this in a deployed environment.');
+  }
 }
 
 main().catch((err) => {
