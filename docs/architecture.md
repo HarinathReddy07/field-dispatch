@@ -12,27 +12,51 @@ flowchart LR
   M <-. Socket.io .-> API
   A <-. Socket.io .-> API
   API[NestJS API<br/>REST + Socket.io] --> PG[(PostgreSQL + PostGIS<br/>system of record)]
-  API --> R[(Redis<br/>throttling, presence, location cache,<br/>socket adapter)]
-  API --> S[(S3-compatible storage<br/>MinIO, private bucket)]
+  API --> R[(Redis<br/>throttling windows, presence,<br/>location cache, socket adapter)]
+  API --> S[(S3-compatible storage<br/>RustFS, private bucket)]
 ```
 
-- **PostgreSQL is the single source of truth** for every business fact. Redis holds only ephemeral data (rate-limit counters,
-  technician presence/latest location, Socket.io fan-out) and is never the only copy of a transaction.
+- **PostgreSQL is the single source of truth** for every business fact. Redis holds only ephemeral data and is never the only copy of a transaction.
+  What Redis holds, with the exact keys and lifetimes:
+
+  | Key / use                                | TTL                                      | Purpose                                                              |
+  | ---------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------- |
+  | `thr:{login\|arrive\|default}:{subject}` | 60 s fixed window                        | rate limits (login and OTP arrival **fail closed** if Redis is down) |
+  | `presence:{technicianId}`                | 90 s                                     | technician presence                                                  |
+  | `loc:{technicianId}`                     | 120 s                                    | latest simulated GPS sample                                          |
+  | `locpersist:{technicianId}`              | `LOCATION_PERSIST_INTERVAL_SECONDS` (NX) | gate so Postgres only gets the last trusted fix every N seconds      |
+  | Socket.io pub/sub channels               | n/a                                      | fan-out to sockets on every API instance (Redis adapter)             |
+
+  **OTP TTL and idempotency are deliberately authoritative in PostgreSQL**, not Redis: the OTP challenge row carries `expires_at`, `attempts`,
+  `consumed_at` and the HMAC, and the idempotency record is written in the same transaction as the business change (ADR 0005). The spec's own rule
+  (§4.4) is that Redis is "never the only copy of a business transaction"; a Redis flush must not be able to resurrect a consumed code or repeat a
+  settlement. Redis therefore supplies presence, location cache, rate-limit TTL windows and cross-instance socket delivery.
+
 - Clients never decide role, state, price, time or timer. The API does, and clients render what it returns.
 
 ## Backend modules (`apps/api/src`)
 
-| Module                | Responsibility                                                                                                         | Notes                                                                         |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `modules/auth`        | login, refresh rotation, `AccessGuard` (authenticate → role → throttle)                                                | argon2id, short-lived JWT, hashed rotating refresh tokens, default-deny roles |
-| `modules/users`       | role-safe profile (`/users/me`)                                                                                        | never exposes hashes/status flags                                             |
-| `modules/requests`    | create/edit/history/snapshot/reorder, `DispatchService` (PostGIS search, atomic confirm), `AccessService` (ownership)  | no socket code                                                                |
-| `modules/jobs`        | `OtpService`, `JobsService` (start/stop/review/cancel/complete), `MediaService`, `SettlementService`, `SweeperService` | OTP/media/payment behind interfaces                                           |
-| `modules/realtime`    | `RealtimeGateway` (JWT handshake, room auth), `OutboxPublisher`, Redis adapter                                         | never writes business data                                                    |
-| `modules/technicians` | availability, location ingestion (Redis latest + throttled Postgres persist)                                           | `LocationProvider` is a mock interface                                        |
-| `modules/admin`       | queries + privileged commands (reassign/cancel)                                                                        | goes through `TransitionService`; never bypasses rules                        |
-| `infra/`              | `TransitionService`, `OutboxService`, `AuditService`, `IdempotencyService`, Prisma/Redis                               | shared, global module                                                         |
-| `domain/`             | pure functions: pricing, ranking, OTP policy, media sniffing, exception flags, hashing                                 | 100 % unit-tested                                                             |
+| Module (`modules/`) | Responsibility (spec §4.1)                                                                                                 | Must not contain / notes                                              |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `auth`              | login, refresh rotation, `AccessGuard` (authenticate → role → throttle)                                                    | no booking rules; argon2id, short-lived JWT, hashed rotating refresh  |
+| `users`             | role-safe profile (`/users/me`)                                                                                            | never exposes password hashes, status flags or other users' data      |
+| `requests`          | create / edit / history / snapshot / reorder, `AccessService` (ownership), `RequestsRepository` (all SQL)                  | no socket code                                                        |
+| `dispatch`          | `DispatchService` (PostGIS candidate search, atomic confirm), `AssignmentsService`; routes `nearby-technicians`, `confirm` | no UI formatting                                                      |
+| `jobs`              | `JobsService` (start / stop / review / cancel / complete), `SweeperService` (review timeout)                               | no identity-verification integration                                  |
+| `otp`               | `OtpService`: generate (`crypto.randomInt`), HMAC, store, verify with TTL, single use, attempt lock                        | never persists or logs the plain code                                 |
+| `media`             | `MediaService` (intent, key generation, finalize, signed read) + `storage/` adapters (S3-compatible, in-memory mock)       | no public-bucket assumption; ownership checked before signing         |
+| `settlement`        | `SettlementService` (one row per request, idempotent) + `payment/` mock provider                                           | no real payment-provider calls                                        |
+| `audit`             | `AuditService`: append-only `audit_logs` writer                                                                            | cannot edit or delete history (DB triggers also refuse UPDATE/DELETE) |
+| `realtime`          | `RealtimeGateway` (JWT handshake, room auth), `OutboxPublisher`, Redis adapter                                             | never writes business data                                            |
+| `admin`             | operational queries + privileged commands (reassign / cancel)                                                              | goes through `TransitionService`; never bypasses state rules          |
+| `technicians`       | availability, location ingestion (Redis latest + throttled Postgres persist); `LocationProvider` is a mock interface       | supporting module (the spec's list of 11 above plus this one)         |
+| `health`            | liveness / readiness probes                                                                                                |                                                                       |
+| `infra/` (global)   | `TransitionService`, `OutboxService`, `IdempotencyService`, Prisma and Redis clients                                       | shared kernel, no HTTP surface                                        |
+| `domain/`           | pure functions: pricing, ranking, OTP policy, media sniffing, exception flags, hashing                                     | 100 % unit-tested                                                     |
+
+The 11 modules of spec §4.1 map as: AuthModule → `auth`, UserModule → `users`, RequestModule → `requests`, DispatchModule → `dispatch`, JobModule → `jobs`,
+OtpModule → `otp`, RealtimeModule → `realtime`, MediaModule → `media`, SettlementModule → `settlement`, AuditModule → `audit`, AdminModule → `admin`.
+Each is a separate Nest module (`*.module.ts`) importing only what it needs; the dependency graph is acyclic (`dispatch` → `requests`; `otp`, `media` → `dispatch`, `requests`; `jobs` → all of them; `admin` → `jobs`, `dispatch`, `media`, `requests`).
 
 Layering: controller (DTOs only) → service (transaction + orchestration) → domain (pure rules) → SQL. The state machine itself is
 a pure table in `packages/contracts` shared by API, admin and mobile.
@@ -90,19 +114,19 @@ Migrations: [`infra/migrations`](../infra/migrations). Highlights: `geography(Po
 
 ## Concurrency strategy
 
-| Invariant                                                  | Enforced by                                                                                                                          |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| One technician, one active job                             | row lock on the technician + partial unique index `assignments_active_technician_uq` + exclusion constraint `assignments_no_overlap` |
-| One active assignment per request                          | partial unique index `assignments_active_request_uq` + request row lock                                                              |
-| Two simultaneous confirms → one 200, one deterministic 409 | `SELECT … FOR UPDATE` on request then technician (fixed lock order); loser gets `STATE_CONFLICT` / `TECHNICIAN_UNAVAILABLE`          |
-| Stale/duplicate commands never overwrite                   | `UPDATE … WHERE id AND version = $expected` after locking the row                                                                    |
-| OTP consumed once                                          | row lock on the challenge + conditional `UPDATE … WHERE consumed_at IS NULL AND expires_at > now()`                                  |
-| Failed OTP attempts are counted exactly                    | outcomes are _returned_ (not thrown) so the attempt counter commits; 12 parallel wrong guesses → exactly 5 invalid + lock            |
-| Exactly one settlement                                     | created inside the completion transaction; `UNIQUE(request_id)` and `UNIQUE(idempotency_key)` as backstop                            |
-| Retries are safe                                           | `Idempotency-Key` stored **in the same transaction** as the business change (ADR 0005)                                               |
-| Events only after commit                                   | transactional outbox + publisher with `FOR UPDATE SKIP LOCKED` (ADR 0003)                                                            |
-| Review timeout survives restarts / multiple instances      | persisted `review_deadline_at` + sweeper claiming rows with `SKIP LOCKED` (ADR 0004)                                                 |
-| History cannot be rewritten                                | DB triggers reject UPDATE/DELETE/TRUNCATE on `job_events` and `audit_logs`                                                           |
+| Invariant                                                  | Enforced by                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One technician per OVERLAPPING work period (§7.1)          | row lock on the technician + overlap check on `time_window` + **exclusion constraint** `assignments_no_overlap` (`technician_id =`, `time_window &&`, `WHERE status = 'ACTIVE'`); the trial additionally keeps the stricter product rule "one ACTIVE job per technician" (`assignments_active_technician_uq`, technician flips to BUSY). `migrations.int` proves the exclusion constraint on its own by dropping the stricter index inside a rolled-back transaction |
+| One active assignment per request                          | partial unique index `assignments_active_request_uq` + request row lock                                                                                                                                                                                                                                                                                                                                                                                              |
+| Two simultaneous confirms → one 200, one deterministic 409 | `SELECT … FOR UPDATE` on request then technician (fixed lock order); loser gets `STATE_CONFLICT` / `TECHNICIAN_UNAVAILABLE`                                                                                                                                                                                                                                                                                                                                          |
+| Stale/duplicate commands never overwrite                   | `UPDATE … WHERE id AND version = $expected` after locking the row                                                                                                                                                                                                                                                                                                                                                                                                    |
+| OTP consumed once                                          | row lock on the challenge + conditional `UPDATE … WHERE consumed_at IS NULL AND expires_at > now()`                                                                                                                                                                                                                                                                                                                                                                  |
+| Failed OTP attempts are counted exactly                    | outcomes are _returned_ (not thrown) so the attempt counter commits; 12 parallel wrong guesses → exactly 5 invalid + lock                                                                                                                                                                                                                                                                                                                                            |
+| Exactly one settlement                                     | created inside the completion transaction; `UNIQUE(request_id)` and `UNIQUE(idempotency_key)` as backstop                                                                                                                                                                                                                                                                                                                                                            |
+| Retries are safe                                           | `Idempotency-Key` stored **in the same transaction** as the business change (ADR 0005)                                                                                                                                                                                                                                                                                                                                                                               |
+| Events only after commit                                   | transactional outbox + publisher with `FOR UPDATE SKIP LOCKED` (ADR 0003)                                                                                                                                                                                                                                                                                                                                                                                            |
+| Review timeout survives restarts / multiple instances      | persisted `review_deadline_at` + sweeper claiming rows with `SKIP LOCKED` (ADR 0004)                                                                                                                                                                                                                                                                                                                                                                                 |
+| History cannot be rewritten                                | DB triggers reject UPDATE/DELETE/TRUNCATE on `job_events` and `audit_logs`                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## Security model
 
@@ -113,6 +137,47 @@ Migrations: [`infra/migrations`](../infra/migrations). Highlights: `geography(Po
 - Media: server-generated keys, presigned PUT/GET with short TTL, size + SHA-256 + magic-byte verification before a file counts as evidence, ownership checked before signing.
 - Logs: allow-list serializer (method, path, status) + redaction; test asserts passwords/OTPs/tokens never appear.
 - Admin console: httpOnly + SameSite=Strict cookies, role verified server-side against the API, same-origin gateway allow-lists `admin/*`.
+
+## Data flow (spec Figure 3)
+
+```mermaid
+sequenceDiagram
+  participant R as Requester app
+  participant API as NestJS API
+  participant PG as PostgreSQL + PostGIS
+  participant RD as Redis
+  participant T as Technician app
+  participant AD as Admin console
+  R->>API: POST /requests (asset, category, location, window)
+  API->>PG: INSERT request + job_events + audit (one transaction)
+  API-->>AD: request.created (outbox, after commit)
+  R->>API: GET /requests/:id/nearby-technicians
+  API->>PG: ST_DWithin candidate search (GiST), rank, server quote
+  API-->>R: options + quote
+  R->>API: POST /confirm (Idempotency-Key)
+  API->>PG: lock request, lock technician, INSERT assignment, transition (one transaction)
+  API-->>T: assignment.created
+  API-->>AD: assignment.created
+  R->>API: POST /otp (code shown to requester)
+  T->>API: POST /arrive {otp}
+  API->>PG: conditional consume of the HMAC challenge, transition ARRIVED
+  T->>API: POST /start, evidence intent, upload to object storage, finalize, POST /stop
+  T->>API: POST /technicians/me/location (GPS sample)
+  API->>RD: latest position + presence (TTL)
+  API-->>R: technician.location.updated, request.state.changed
+  R->>API: POST /review (approve | rework)
+  API->>PG: transition COMPLETED then SETTLED + the single settlement row
+  API-->>R: settlement.created
+```
+
+## Identity data and operational data (production note)
+
+**In production the identity / KYC data would be separated from operational profiles.** The trial has no KYC at all: no Aadhaar or e-PAN is
+collected, users are synthetic, and the `users` table holds only a display name, role, rating and credential hash. A production build would keep
+identity documents and verification results in a separate service and datastore (own database, own access policy and retention), exposing only a
+verified/not-verified flag and an opaque identity reference to the operational platform. Dispatch, jobs, audit and logs would then never see
+identity attributes, and a breach of the operational database would not expose KYC data. The integration point is an interface; the trial leaves it
+unimplemented on purpose (spec §6.1 "PII minimization", §12 exclusions).
 
 ## Real-time design
 
@@ -135,7 +200,7 @@ Migrations: [`infra/migrations`](../infra/migrations). Highlights: `geography(Po
 
 ## Path to the 25-day product
 
-- Replace mocks behind existing interfaces: `PaymentProvider` (real gateway + payouts), `StorageProvider` (S3/MinIO already implemented, untested here), `LocationProvider` (device GPS + background tracking).
+- Replace mocks behind existing interfaces: `PaymentProvider` (real gateway + payouts), `LocationProvider` (device GPS + background tracking). `StorageProvider` already has a real S3-compatible adapter, tested against a real server.
 - Add KYC/identity as a separate service with its own store; keep operational profiles free of identity data.
 - Observability: ship the structured logs + correlation ids to a log store, add metrics/alerts; move the sweeper/outbox to dedicated workers if load requires (they are already multi-instance safe).
 - Scale-out: API is stateless apart from Redis-backed sockets; add a read replica for admin queries; partition `audit_logs`/`job_events` by time.

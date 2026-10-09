@@ -1,6 +1,7 @@
 # API reference
 
-Base URL `http://localhost:3000/api/v1` (health probes are unprefixed). Interactive docs: `GET /api/docs` (Swagger UI), `/api/docs-json`.
+Base URL `http://localhost:3000/api/v1` locally (health probes are unprefixed); behind the TLS profile it is `https://api.<domain>/api/v1` ([deploy-tls](deploy-tls.md)).
+Interactive docs (Swagger UI at `/api/docs`, JSON at `/api/docs-json`) are **off unless `SWAGGER_ENABLED=true`**; this file is the maintained reference.
 All bodies are JSON and validated by shared zod schemas (`packages/contracts`); **unknown fields are rejected** with `400 VALIDATION_FAILED`.
 
 ## Conventions
@@ -9,6 +10,7 @@ All bodies are JSON and validated by shared zod schemas (`packages/contracts`); 
 - `Idempotency-Key: <8-128 chars [A-Za-z0-9_.:-]>` is **required** on confirm, arrive, start, stop, review, cancel and evidence finalize. Replaying a key returns the original result; the same key with a different body → `422 IDEMPOTENCY_MISMATCH`.
 - `x-correlation-id` (optional, 8-64 chars) is echoed on every response and appears in logs, audit rows and error bodies.
 - Error envelope: `{ "code": "…", "message": "…", "correlationId": "…", "details"?: … }`.
+- Unless `INSECURE_LOCAL_DEV=true`, plain HTTP is refused with `426 HTTPS_REQUIRED` (health probes excepted) and plain WebSocket handshakes with `connect_error: HTTPS_REQUIRED`; TLS is terminated by a proxy that sets `X-Forwarded-Proto`.
 - Access to someone else's record returns **404** (never 403), so ids cannot be probed.
 - Money is integer minor units (INR paise). Timestamps are ISO-8601 UTC; every request view includes `serverTime`.
 
@@ -24,21 +26,21 @@ All bodies are JSON and validated by shared zod schemas (`packages/contracts`); 
 
 ## Requests (requester unless noted)
 
-| Method | Path                                              | Notes                                                                                                                           |
-| ------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/requests`                                       | `{assetId, category, location:{lat,lon}, windowStart, windowEnd, notes?}` → `RequestView` (state `REQUESTED`)                   |
-| PATCH  | `/requests/:id`                                   | edit while `REQUESTED` (`REQUESTED → DRAFT → REQUESTED`); at least one field                                                    |
-| GET    | `/requests/active`                                | requester/technician: in-flight requests                                                                                        |
-| GET    | `/requests/history?page=`                         | requester/technician: finished (settled/cancelled)                                                                              |
-| GET    | `/requests/:id`                                   | owner, assigned technician, admin                                                                                               |
-| GET    | `/requests/:id/snapshot?since=<seq>`              | `{request, events[], cursor}` for reconnect resync                                                                              |
-| GET    | `/requests/:id/nearby-technicians?radiusKm&limit` | PostGIS ranked list `{technicianId,name,rating,distanceKm,quoteMinor,availability}`; moves `REQUESTED → MATCHED`                |
-| POST   | `/requests/:id/confirm`                           | `{technicianId}` + Idempotency-Key. Requires `MATCHED`. 409 `STATE_CONFLICT` / `TECHNICIAN_UNAVAILABLE` for the loser of a race |
-| POST   | `/requests/:id/otp`                               | issue arrival code (state `CONFIRMED`) → `{otp, expiresAt}`; the plain code is returned once                                    |
-| POST   | `/requests/:id/cancel`                            | + key. `CONFIRMED` → back to `REQUESTED` (booking released); earlier states → `CANCELLED`                                       |
-| POST   | `/requests/:id/review`                            | + key. `{decision:"APPROVE"}` or `{decision:"REQUEST_REWORK", reason}`                                                          |
-| POST   | `/requests/:id/reorder`                           | new `REQUESTED` request prefilled from a finished one                                                                           |
-| GET    | `/requests/:id/evidence`                          | finalized evidence with short-lived signed GET URLs                                                                             |
+| Method | Path                                              | Notes                                                                                                                                            |
+| ------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/requests`                                       | `{assetId, category, location:{lat,lon}, windowStart, windowEnd, notes?}` → `RequestView` (state `REQUESTED`)                                    |
+| PATCH  | `/requests/:id`                                   | edit while `REQUESTED` (`REQUESTED → DRAFT → REQUESTED`); at least one field                                                                     |
+| GET    | `/requests/active`                                | requester/technician: in-flight requests                                                                                                         |
+| GET    | `/requests/history?page=`                         | requester/technician: finished (settled/cancelled)                                                                                               |
+| GET    | `/requests/:id`                                   | owner, assigned technician, admin                                                                                                                |
+| GET    | `/requests/:id/snapshot?since=<seq>`              | `{request, events[], cursor}` for reconnect resync                                                                                               |
+| GET    | `/requests/:id/nearby-technicians?radiusKm&limit` | (spec 8.1 route, kept as `GET`) PostGIS ranked list `{technicianId,name,rating,distanceKm,quoteMinor,availability}`; moves `REQUESTED → MATCHED` |
+| POST   | `/requests/:id/confirm`                           | `{technicianId}` + Idempotency-Key. Requires `MATCHED`. 409 `STATE_CONFLICT` / `TECHNICIAN_UNAVAILABLE` for the loser of a race                  |
+| POST   | `/requests/:id/otp`                               | issue arrival code (state `CONFIRMED`) → `{otp, expiresAt}`; the plain code is returned once                                                     |
+| POST   | `/requests/:id/cancel`                            | + key. `CONFIRMED` → back to `REQUESTED` (booking released); earlier states → `CANCELLED`                                                        |
+| POST   | `/requests/:id/review`                            | + key. `{decision:"APPROVE"}` or `{decision:"REQUEST_REWORK", reason}`                                                                           |
+| POST   | `/requests/:id/reorder`                           | new `REQUESTED` request prefilled from a finished one                                                                                            |
+| GET    | `/requests/:id/evidence`                          | finalized evidence with short-lived signed GET URLs                                                                                              |
 
 ## Technician
 
@@ -112,4 +114,6 @@ Every event is `{eventId, occurredAt, schemaVersion:1, seq, type, requestId, dat
 | `OTP_LOCKED`               | 429                | attempt limit reached; temporary block                              |
 | `RATE_LIMITED`             | 429                | Redis-backed throttle (strict on login and arrive)                  |
 | `MEDIA_REJECTED`           | 422                | uploaded object missing or fails size/checksum/type checks          |
+| `HTTPS_REQUIRED`           | 426                | plain HTTP/WS while `INSECURE_LOCAL_DEV=false`                      |
+| `SERVICE_UNAVAILABLE`      | 503                | login / OTP-arrival rate limiter unavailable (fails closed)         |
 | `INTERNAL`                 | 500                | unexpected; details only in server logs, matched by `correlationId` |

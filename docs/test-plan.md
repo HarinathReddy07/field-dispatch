@@ -1,81 +1,89 @@
 # Test plan
 
-Everything below runs against **real PostgreSQL + PostGIS and Redis** (Testcontainers by default, or `TEST_ADMIN_DATABASE_URL` / `TEST_REDIS_URL` to reuse running instances).
-Each integration suite creates its own migrated, seeded database, so suites are isolated. See [runbook](runbook.md) for commands.
+Everything below runs against **real PostgreSQL + PostGIS, Redis and an S3-compatible server** (Testcontainers starts them, or point the suites at running ones with
+`TEST_ADMIN_DATABASE_URL`, `TEST_REDIS_URL`, `TEST_S3_ENDPOINT`/`TEST_S3_ACCESS_KEY`/`TEST_S3_SECRET_KEY`). Each integration suite creates its own migrated, seeded database and its own Redis keyspace, so suites are isolated.
+`*.int` below means `apps/api/test/integration/*.int.spec.ts`. Commands, environment and troubleshooting: [runbook](runbook.md). Latest results and counts: [STATUS](STATUS.md).
 
 ## How to run
 
-| What                                                 | Command                                             | Needs                                                 |
-| ---------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------- |
-| Everything (lint, typecheck, all unit + integration) | `pnpm lint && pnpm typecheck && pnpm test`          | Docker (Testcontainers) **or** the two env vars above |
-| API unit + integration                               | `pnpm --filter @dispatch/api test`                  | same                                                  |
-| Coverage gate (domain + dispatch ≥ 90 % lines)       | `pnpm --filter @dispatch/api test:cov`              | same                                                  |
-| Acceptance scenarios A1-A7 (+ realtime)              | `make e2e` = `pnpm --filter @dispatch/api test:e2e` | same                                                  |
-| Contract/state-machine tests                         | `pnpm --filter @dispatch/contracts test`            | –                                                     |
-| Admin unit tests                                     | `pnpm --filter @dispatch/admin test`                | –                                                     |
-| Admin Playwright smoke                               | `pnpm --filter @dispatch/admin test:smoke`          | running API + admin + seeded DB (`make demo`)         |
-| Mobile unit + component tests                        | `pnpm --filter @dispatch/mobile test`               | –                                                     |
+| What                                                 | Command                                                                                                  | Needs                                                               |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Everything (lint, typecheck, all unit + integration) | `pnpm lint && pnpm typecheck && pnpm test` (or `make test`)                                              | Docker (Testcontainers) **or** the `TEST_*` variables               |
+| API unit + integration only                          | `pnpm --filter @dispatch/api test`                                                                       | same                                                                |
+| One suite                                            | `cd apps/api && npx jest --config jest.config.js -- test/integration/otp.int.spec.ts`                    | same                                                                |
+| Acceptance scenarios A1-A7 (+ realtime)              | `make e2e` = `pnpm --filter @dispatch/api test:e2e`                                                      | same                                                                |
+| Coverage gate (domain + dispatch ≥ 90 % lines)       | `make cov`                                                                                               | same                                                                |
+| Concurrency loop (reproducible)                      | `CONCURRENCY_ITERATIONS=50 npx jest --config jest.config.js -- test/integration/concurrency.int.spec.ts` | same                                                                |
+| Contract / state-machine tests                       | `pnpm --filter @dispatch/contracts test`                                                                 | -                                                                   |
+| Admin unit tests · browser tests                     | `pnpm --filter @dispatch/admin test` · `pnpm --filter @dispatch/admin test:smoke`                        | running API + admin + seeded DB (`make demo`) for the browser tests |
+| Mobile unit + component tests                        | `pnpm --filter @dispatch/mobile test`                                                                    | -                                                                   |
 
-## Required test levels (requirement spec §9)
+## Required test levels (spec §9.1)
 
-| Level                                                             | Where                                                                                             |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Unit: state transitions                                           | `packages/contracts/src/contracts.spec.ts` (every state × action × actor = 776 cases)             |
-| Unit: OTP policy, proximity ranking, pricing, idempotency hashing | `apps/api/src/domain/*.spec.ts`                                                                   |
-| Integration: booking, arrival, proof gating, settlement           | `lifecycle.int`, `dispatch.int`, `otp.int`, `settlement.int`                                      |
-| Concurrency                                                       | `concurrency.int` (A4, 20× loops), `otp.int` (parallel OTP), `settlement.int` (parallel finalize) |
-| Realtime                                                          | `realtime.int`                                                                                    |
-| Security                                                          | `security.int`, `otp.int`, `media.int`, `admin.int`, `logging.int`, `auth.int`                    |
-| Restart                                                           | `restart.int`                                                                                     |
-| Admin UI                                                          | `apps/admin/tests/smoke/live-board.spec.ts`                                                       |
-| Mobile logic/components                                           | `apps/mobile/src/**/__tests__`                                                                    |
+| Level                                                             | Where                                                                                                                             |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Unit: state transitions                                           | `packages/contracts/src/contracts.spec.ts` (every state × action × actor = 776 cases)                                             |
+| Unit: OTP policy, proximity ranking, pricing, idempotency hashing | `apps/api/src/domain/*.spec.ts`                                                                                                   |
+| Unit: environment validation                                      | `apps/api/src/config/env.spec.ts`                                                                                                 |
+| Integration: booking, arrival, proof gating, settlement           | `dispatch.int`, `lifecycle.int`, `otp.int`, `settlement.int`, `transition.int`                                                    |
+| Concurrency                                                       | `concurrency.int` (A4, repeated loops), `otp.int` (parallel OTP), `settlement.int` (parallel finalize), `migrations.int`          |
+| Realtime                                                          | `realtime.int` (log: [evidence/realtime-test.log](evidence/realtime-test.log))                                                    |
+| Security                                                          | `security.int`, `otp.int`, `media.int`, `storage.s3.int`, `admin.int`, `logging.int`, `auth.int`, `throttle.int`, `transport.int` |
+| Object storage adapter on a real S3-compatible server             | `storage.s3.int`                                                                                                                  |
+| Restart                                                           | `restart.int`                                                                                                                     |
+| Seed contract (Appendix A)                                        | `seed.int`                                                                                                                        |
+| Admin UI (browser)                                                | `apps/admin/tests/smoke/live-board.spec.ts`, `apps/admin/tests/ui/admin-ui.spec.ts`                                               |
+| Mobile logic and screens                                          | `apps/mobile/src/**/__tests__` (all 9 specified screens for both roles, tabs, timer, client, evidence pipeline)                   |
 
-(`*.int` = `apps/api/test/integration/*.int.spec.ts`.)
+## Acceptance scenarios (spec §9.2)
 
-## Acceptance scenarios
+| ID  | Scenario                                                                               | Test file › test                                                                                                                                                                                                            |
+| --- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | Happy path, no manual DB edits                                                         | `lifecycle.int` › _A1 happy path: request -> assign -> OTP arrival -> work -> 2 images -> approve -> one settlement_                                                                                                        |
+| A2  | Rework → new evidence → approve; history retained                                      | `lifecycle.int` › _A2 rework: history is preserved and the new cycle needs its own evidence_                                                                                                                                |
+| A3  | Wrong, expired, replayed OTP blocked; brute force locks; parallel verify = one ARRIVED | `otp.int` › _wrong, expired and superseded codes fail with one uniform error; a valid code works once_, _brute force…_, _10 parallel verifications…_, _concurrent wrong guesses…_                                           |
+| A4  | Competing confirms: one winner, deterministic 409                                      | `concurrency.int` › _10 parallel confirms on the SAME request…_, _10 competing requests confirm the SAME technician…_, _database constraints independently reject double booking_                                           |
+| A5  | Cross-user job read, technician on admin endpoint                                      | `admin.int` › _every admin route rejects anonymous callers_, _requesters and technicians cannot touch other users' jobs through any route_; `security.int` › IDOR tests                                                     |
+| A6  | Repeated finalization → exactly one settlement                                         | `settlement.int` › _20 parallel approvals…_, _20 retries with the SAME key…_, _a settlement can never be duplicated at the database level_                                                                                  |
+| A7  | API restart mid-flow                                                                   | `restart.int` › _assignment, OTP and work state survive a restart and the flow continues_, _the review timeout still fires after a restart_; container restart: CI `docker-clean-start` job + [demo script](demo-script.md) |
 
-| ID  | Scenario                                                                               | Test                                                                                                                                                |
-| --- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A1  | Happy path, no manual DB edits                                                         | `lifecycle.int` › _A1 happy path_                                                                                                                   |
-| A2  | Rework → new evidence → approve; history retained                                      | `lifecycle.int` › _A2 rework_                                                                                                                       |
-| A3  | Wrong, expired, replayed OTP blocked; brute force locks; parallel verify = one ARRIVED | `otp.int` (7 tests)                                                                                                                                 |
-| A4  | Competing confirms: one winner, deterministic 409                                      | `concurrency.int` (same request ×10, 10 requests→1 technician ×10, 20 iterations each)                                                              |
-| A5  | Cross-user job read, technician on admin endpoint                                      | `admin.int` (every admin route × tech/requester/anonymous), `security.int` (IDOR)                                                                   |
-| A6  | Repeated finalization → exactly one settlement                                         | `settlement.int` (20 parallel approvals, 20 same-key retries, sweeper race)                                                                         |
-| A7  | API restart mid-flow                                                                   | `restart.int` (state, OTP, token validity survive; sweeper resumes). Container kill/restart: `docker compose restart api` during the demo (runbook) |
+## Data security matrix (spec §9.3)
 
-## Security matrix (requirement spec §9)
+| Risk                   | Test file › test                                                                                                                                                                                                                                                             | Pass condition                                                 |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| IDOR / object access   | `security.int` › _another requester gets 404 identical to a non-existent id_, _an unassigned technician cannot read…_; `admin.int`                                                                                                                                           | 404, identical to a missing id                                 |
+| Privilege escalation   | `security.int` › _rejects a role supplied by the client in any payload_, _role comes from the database, not the token…_                                                                                                                                                      | 400 / 401, no escalation                                       |
+| OTP replay             | `otp.int` › _wrong, expired and superseded codes fail…; a valid code works once_                                                                                                                                                                                             | second use rejected (uniform error)                            |
+| OTP brute force        | `otp.int` › _brute force: attempts are counted, the code locks…_, _concurrent wrong guesses are all counted…_; `auth.int` › _rate limits login attempts_; `throttle.int`                                                                                                     | exactly 5 invalid then `429 OTP_LOCKED`; limiter fails closed  |
+| Mass assignment        | `security.int` › _rejects client-supplied price on confirm_ and strict-DTO tests; `lifecycle.int` › _edit…_; `settlement.int` › _client amounts are rejected_; `transition.int` › _a client cannot push a request to COMPLETED…_                                             | unknown/protected fields rejected (400)                        |
+| Sensitive logging      | `logging.int` › _never passwords, OTPs, tokens or auth headers_, _stamps EVERY application log line…redacts secrets and addresses_                                                                                                                                           | secrets absent from log output                                 |
+| Media exposure         | `media.int` › _only participants can read evidence, via short-lived signed URLs that expire_; `storage.s3.int` › _DENIES an expired signed URL_, _DENIES a URL that was not signed for this object…_, _keeps the bucket private…_, _…enforces signed-URL access for readers_ | 403 after expiry (real server); wrong user gets 404 and no URL |
+| SQL injection baseline | `security.int` › _stores hostile strings as data and leaves the schema intact_, _rejects injected pagination and unknown query keys_, _login with an injection-style email…_                                                                                                 | no query manipulation, no error leakage                        |
+| Duplicate commands     | `dispatch.int`, `concurrency.int` › _retries with the same Idempotency-Key…_, `otp.int` › _arrive is idempotent…_, `media.int`, `settlement.int`                                                                                                                             | same result, no extra events                                   |
 
-| Risk                                   | Test                                                                             | Result expected                                                        |
-| -------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| IDOR by changed id                     | `security.int` › IDOR; `admin.int` › other users' jobs through any route         | 404, identical to missing id                                           |
-| Role changed in payload                | `security.int` › role enforcement                                                | 400, no escalation; forged JWTs → 401                                  |
-| OTP replay                             | `otp.int`                                                                        | 409 `ILLEGAL_TRANSITION`                                               |
-| OTP brute force                        | `otp.int`                                                                        | exactly 5 invalid then 429 `OTP_LOCKED`, even for the correct code     |
-| Mass assignment                        | `security.int`, `lifecycle.int` (edit), `settlement.int` (amount)                | 400 on any unknown/protected field                                     |
-| Secrets absent from logs               | `logging.int`                                                                    | no password/OTP/token/Authorization in captured log output             |
-| Evidence URL after expiry / wrong user | `media.int`                                                                      | 410 after expiry (mock bucket), 403 tampered, 404 for non-participants |
-| SQL injection baseline                 | `security.int`                                                                   | hostile strings stored as data; injected filters → 400; schema intact  |
-| Duplicate mutation idempotent          | `dispatch.int`, `concurrency.int`, `otp.int`, `media.int`, `settlement.int`      | same result, no extra events                                           |
-| Technician token on admin endpoint     | `admin.int`                                                                      | 403, envelope only                                                     |
-| `COMPLETED` without evidence           | `lifecycle.int` (stop with 1 image → 409), `security.int` (state field rejected) | rejected                                                               |
-| Tampered settlement amount             | `settlement.int`                                                                 | 400; amount equals server quote                                        |
-| Unauthorized socket room join          | `realtime.int`                                                                   | `{ok:false, NOT_FOUND}`, no events                                     |
-| Append-only history                    | `migrations.int`                                                                 | UPDATE/DELETE/TRUNCATE blocked                                         |
+## Information-hiding cases (spec §6.2)
 
-## Results (last full run on the author's machine: no Docker; PostgreSQL 16.4 + PostGIS 3.6, Redis 5)
+| Case                                                | Test                                                                                                                                                                 |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Requester requests another's job by changing an ID  | `security.int` › _another requester gets 404 identical to a non-existent id_                                                                                         |
+| Technician requests technician identities / profile | `security.int` › _a technician only sees their own profile fields via /users/me_; `admin.int` › _technicians never see the requester or each other (response shape)_ |
+| Technician subscribes to a room not assigned        | `realtime.int` › _room joins are authorized server-side; location samples reach only authorized viewers_                                                             |
+| Admin-only API with a technician token              | `admin.int` › _requesters and technicians cannot touch other users' jobs through any route_ (every admin route × role)                                               |
+| Client submits COMPLETED while evidence is missing  | `lifecycle.int` › _cannot skip states_; `transition.int` › _a client cannot push a request to COMPLETED/SETTLED…_                                                    |
+| Client changes the settlement amount                | `settlement.int` › _the settlement amount is the server-held quote; client amounts are rejected_                                                                     |
 
-| Suite                                                                      | Result                                                                                    |
-| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `pnpm lint`, `pnpm typecheck`                                              | clean                                                                                     |
-| `pnpm test`                                                                | admin 6 · contracts 776 · ui-tokens 60 · mobile 44 · API 146 tests in 16 suites: all pass |
-| `make e2e` (A1-A7 + realtime)                                              | 8 suites (subset of the 16 API suites) pass                                               |
-| coverage (`test:cov`)                                                      | domain 100 %, dispatch 98.4 % lines (gate 90 %)                                           |
-| admin Playwright smoke (against a locally running API + admin + seeded DB) | 8 passed                                                                                  |
-| `expo export --platform android`                                           | Hermes bundle builds                                                                      |
+## Other invariants proven by tests
 
-Recorded in [`STATUS.md`](STATUS.md) after each slice. The CI workflow runs the same suites with `postgis/postgis:16-3.4` and `redis:7` service containers.
+| Invariant                                                            | Test                                                                                    |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Transition + job_event + audit + outbox in one transaction; rollback | `transition.int`                                                                        |
+| Overlapping work period exclusion constraint (on its own)            | `migrations.int` › _exclusion constraint rejects overlapping ACTIVE windows on its own_ |
+| Append-only `job_events` / `audit_logs`                              | `migrations.int` › _blocks UPDATE, DELETE and TRUNCATE…_                                |
+| Plain HTTP/WS refused unless `INSECURE_LOCAL_DEV=true`               | `transport.int`, `env.spec`                                                             |
+| Swagger off by default                                               | `auth.int` › _exposes OpenAPI/Swagger only when SWAGGER_ENABLED=true_                   |
+| Env validation fails fast, never echoes values                       | `env.spec`                                                                              |
+| Seed matches Appendix A; no hard-coded OTP in code                   | `seed.int`                                                                              |
 
-## Not yet covered by automation
+## Not automated
 
-See [known-limitations](known-limitations.md): MinIO adapter (needs MinIO), container-level restart, performance/load numbers, mobile on a device/emulator.
+See [known limitations](known-limitations.md): the mobile app on a physical device or emulator, and the human-recorded demo.

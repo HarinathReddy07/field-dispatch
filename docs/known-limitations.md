@@ -7,18 +7,16 @@
 | Payments / settlement                   | `MockPaymentProvider` (deterministic reference `MOCK-…`); ledger row is real, no money moves | payment gateway behind `PaymentProvider` |
 | GPS                                     | the mobile app posts simulated samples; `LocationProvider` is an interface only              | device location + background tracking    |
 | KYC / identity                          | not present; synthetic users only                                                            | separate identity service                |
-| In-memory object store                  | `STORAGE_PROVIDER=memory` (tests)                                                            | `minio` adapter (S3-compatible)          |
+| In-memory object store                  | `STORAGE_PROVIDER=memory` (a few tests; refused when `NODE_ENV=production`)                  | S3-compatible adapter (default, tested)  |
 | Ratings, push notifications, geofencing | static seed values / none                                                                    | product work                             |
 
 ## Not verified in the author's environment
 
-The author's machine had **no Docker**. Therefore:
+The author's machine had **no Docker** (and no WSL). Everything below was therefore verified a different way or is listed for a human to run:
 
-- `docker compose up`, the Dockerfiles, the `migrate`/`seed` services and the `make` targets were written but **never executed here**. Treat the first `make up` on a Docker host as the first real run (CI uses service containers for the same database/Redis images).
-- The **MinIO adapter** (`modules/jobs/storage/minio.storage.ts`) has never talked to a real MinIO. Presigned PUT signs `Content-Type` and `Content-Length`; if a MinIO version rejects that combination, adjust `signableHeaders` there. Tests use the in-memory mock, which models URL expiry and signatures.
-- Container-level restart (A7) was not executed; the in-process restart test covers the same guarantees (state in Postgres, OTP in Postgres, tokens stateless, sweeper resumes).
-- The **mobile app has not been run on a device or emulator** in this environment. It is type-checked, its logic/API-client/evidence-pipeline/component tests pass (44), and the Android Hermes bundle builds under Metro (all imports, including the shared contracts, resolve). Camera, secure storage, Socket.io on hardware and the Expo runtime are untested.
-- No load/performance run (k6/autocannon) and no `EXPLAIN ANALYZE` evidence for the nearby query were recorded.
+- `docker compose up`, the Dockerfiles and the `make` targets were **not executed with Docker here**. What was done instead: `docker compose config` validates the compose files, `caddy validate` accepts the Caddyfile, and the exact steps each Dockerfile runs (filtered `pnpm install`, build, `pnpm prune --prod`, Next.js standalone) were replayed on a clean directory and the resulting API and admin servers were started against real PostgreSQL/PostGIS, Redis and RustFS ([clean-start transcript](clean-start-transcript.md)). The CI job `docker-clean-start` runs the real `make up && make seed && make e2e` on Linux; its first green run is still to be seen.
+- The **mobile app has not been run on a device or emulator**. It is type-checked and lint-clean, all nine specified screens have component tests for both roles (render, role gating, key action, loading/empty/error), and the Android Hermes bundle builds under Metro (all imports resolve, including fonts and icons). Camera, secure storage, Socket.io on hardware and the Expo runtime are untested.
+- Container-level restart (A7) is covered in-process by `restart.int`; the CI job stops the API container (graceful shutdown, exit code 0) and starts it again.
 
 ## Technical limitations
 
@@ -26,9 +24,11 @@ The author's machine had **no Docker**. Therefore:
 - **Data retention:** `idempotency_keys`, `outbox_events` (published rows) and `refresh_tokens` are never purged; a production system needs a retention job.
 - **Outbox ordering:** events get a sequence number at insert time but can commit out of order; clients order by `seq` and always refetch REST state, so state is never wrong, only briefly stale.
 - **Concurrent refresh:** two simultaneous refreshes with the same token are treated as token reuse and revoke the family (strict by design; the mobile client single-flights refresh).
-- **Throttling fails open** if Redis is down (OTP attempts remain bounded in the database).
+- **Throttling:** login and OTP arrival **fail closed** (503) if Redis is down; other routes fail open so a cache outage does not take the API down (OTP attempts are bounded in the database either way).
 - **Socket events are not rate-limited** beyond a per-socket cap on room subscriptions.
-- **HTTPS/WSS** is a deployment concern (reverse proxy); the repo ships plain HTTP for local use and secure-by-default cookies in the admin app.
+- **HTTPS/WSS:** the API refuses plain HTTP/WS unless `INSECURE_LOCAL_DEV=true`; TLS terminates at a reverse proxy (Caddy profile in `infra/docker-compose.tls.yml`). The API trusts `X-Forwarded-Proto` from that one proxy, so it must not be reachable except through it.
+- **One active job per technician:** the trial keeps a stricter rule than the spec's "overlapping work period" (a booked technician is BUSY); the overlap exclusion constraint is the database-level rule and is tested on its own.
+- **`GET /requests/:id/nearby-technicians` has a side effect** on its first call (`REQUESTED → MATCHED`), as the spec defines the route; repeat calls are read-only.
 - **Timezones:** all times are UTC on the wire; the apps render in the device/browser locale.
 - **Search:** one radius + freshness window; no capacity planning, no multi-technician offers, no re-matching after rejection (a requester re-searches).
 - **Admin map** uses public OpenStreetMap tiles (needs internet); the mobile app shows coordinates/distance, not a map.
