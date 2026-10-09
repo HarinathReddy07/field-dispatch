@@ -1,4 +1,6 @@
 import { Writable } from 'node:stream';
+import { Logger } from 'nestjs-pino';
+import { ctxStore } from '../../src/common/context';
 import { ACCOUNTS, DEV_PASSWORD, TestCtx, createTestApp } from '../support/app';
 import { Flow } from '../support/flow';
 
@@ -72,5 +74,42 @@ describe('sensitive logging', () => {
     expect(all).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}\./); // no JWTs
     // no request bodies or query strings at all
     expect(all).not.toContain('"body"');
+  });
+
+  it('stamps EVERY application log line with the correlation id and redacts secrets and addresses', async () => {
+    const before = lines.length;
+    const logger = ctx.app.get(Logger);
+    ctxStore.run({ correlationId: 'probe-corr-0001' }, () => {
+      logger.log(
+        {
+          otp: '482915',
+          password: 'hunter2-hunter2',
+          refreshToken: 'rt-secret-value',
+          nested: {
+            accessToken: 'at-secret-value',
+            address: '221B Baker Street, Bengaluru',
+            notes: 'gate code 9911',
+          },
+          location: { lat: 12.97, lon: 77.59 },
+        },
+        'application event outside any HTTP request log',
+      );
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    const line = lines.slice(before).join('');
+    const entry = JSON.parse(line.trim().split('\n').pop()!) as Record<string, unknown>;
+    expect(entry.correlationId).toBe('probe-corr-0001');
+    for (const leaked of [
+      '482915',
+      'hunter2',
+      'rt-secret-value',
+      'at-secret-value',
+      'Baker Street',
+      '9911',
+      '12.97',
+    ]) {
+      expect(line).not.toContain(leaked);
+    }
+    expect(line).toContain('[REDACTED]');
   });
 });

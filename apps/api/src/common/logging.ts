@@ -1,7 +1,22 @@
 import type { Writable } from 'node:stream';
 import type { Options } from 'pino-http';
 import type { Env } from '@dispatch/config';
-import { resolveCorrelationId } from './context';
+import { currentCorrelationId, resolveCorrelationId } from './context';
+
+const SECRET_KEYS = [
+  'password',
+  'otp',
+  'otp_hmac',
+  'token',
+  'accessToken',
+  'refreshToken',
+  'authorization',
+  'cookie',
+  'secret',
+  'apiKey',
+  'uploadUrl', // presigned evidence URLs are credentials while they are valid
+];
+const PRIVATE_KEYS = ['address', 'location', 'notes', 'lat', 'lon'];
 
 /**
  * Request logging policy.
@@ -17,6 +32,8 @@ export function buildPinoHttpOptions(
     level: overrides.level ?? (env.NODE_ENV === 'test' ? 'silent' : 'info'),
     ...(overrides.stream ? { stream: overrides.stream } : {}),
     genReqId: (req) => resolveCorrelationId(req as never),
+    // EVERY line (request logs and application logs from services, the sweeper, the outbox) carries the current correlation id.
+    mixin: () => ({ correlationId: currentCorrelationId() ?? undefined }),
     customProps: (req) => ({ correlationId: (req as { id?: string }).id }),
     serializers: {
       req: (req: { id: string; method: string; url: string }) => ({
@@ -28,17 +45,18 @@ export function buildPinoHttpOptions(
     },
     redact: {
       paths: [
+        // headers that can carry credentials (the request serializer already drops headers; this is defence in depth)
         'req.headers.authorization',
         'req.headers.cookie',
+        'req.headers["x-api-key"]',
+        'res.headers["set-cookie"]',
         'req.body.password',
         'req.body.otp',
         'req.body.refreshToken',
-        '*.password',
-        '*.otp',
-        '*.token',
-        '*.accessToken',
-        '*.refreshToken',
-        '*.otp_hmac',
+        // credentials, OTPs and tokens at the top level of a log object and one level down
+        ...SECRET_KEYS.flatMap((k) => [k, `*.${k}`]),
+        // private addresses and free text about a site
+        ...PRIVATE_KEYS.flatMap((k) => [k, `*.${k}`]),
       ],
       censor: '[REDACTED]',
     },
