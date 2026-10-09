@@ -104,7 +104,7 @@ export class Flow {
     return job;
   }
 
-  /** intent -> upload to the (mock) presigned URL -> finalize. Returns the finalize response. */
+  /** intent -> upload to the presigned URL (mock or real storage) -> finalize. Returns the finalize response. */
   async uploadEvidence(
     id: string,
     tech: Who,
@@ -124,8 +124,15 @@ export class Flow {
       null,
     );
     if (intent.status !== 200) return intent;
-    expectOk(this.storage.put(intent.body.uploadUrl, bytes));
+    expectOk(await this.upload(intent.body.uploadUrl, bytes, opts.declared ?? 'image/png'));
     return this.post(tech, `/requests/${id}/evidence`, { mediaId: intent.body.mediaId });
+  }
+
+  /** PUT to a presigned URL: the in-process mock, or a real S3-compatible server over HTTP. */
+  private async upload(url: string, bytes: Buffer, contentType: string): Promise<number> {
+    if (this.storage.isMock) return this.storage.put(url, bytes);
+    const res = await fetch(url, { method: 'PUT', body: bytes, headers: { 'Content-Type': contentType } });
+    return res.status;
   }
 
   async twoImages(id: string, tech: Who) {
