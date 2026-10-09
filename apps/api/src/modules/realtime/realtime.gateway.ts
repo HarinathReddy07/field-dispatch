@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -11,6 +11,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
 import { z } from 'zod';
+import type { Env } from '@dispatch/config';
 import {
   EventEnvelope,
   EventPayloads,
@@ -19,6 +20,8 @@ import {
   rooms,
 } from '@dispatch/contracts';
 import { AuthUser } from '../../common/decorators';
+import { isSecureTransport } from '../../common/transport';
+import { APP_CONFIG } from '../../config/config.module';
 import { PrismaService } from '../../infra/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { AccessService } from '../requests/access.service';
@@ -46,10 +49,18 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, Real
     private readonly auth: AuthService,
     private readonly access: AccessService,
     private readonly prisma: PrismaService,
+    @Inject(APP_CONFIG) private readonly cfg: Env,
   ) {}
 
   afterInit(server: Server): void {
     server.use(async (socket, next) => {
+      // Deployable profile: WSS only (TLS terminates at the reverse proxy, which sets X-Forwarded-Proto).
+      if (
+        !this.cfg.INSECURE_LOCAL_DEV &&
+        !isSecureTransport(socket.handshake.headers, socket.handshake.secure)
+      ) {
+        return next(new Error('HTTPS_REQUIRED'));
+      }
       const token = (socket.handshake.auth as { token?: unknown } | undefined)?.token;
       if (typeof token !== 'string') return next(new Error('UNAUTHENTICATED'));
       try {

@@ -17,7 +17,9 @@ export const ERROR_CODES = {
   OTP_LOCKED: 429,
   RATE_LIMITED: 429,
   MEDIA_REJECTED: 422,
+  HTTPS_REQUIRED: 426,
   INTERNAL: 500,
+  SERVICE_UNAVAILABLE: 503,
 } as const;
 export type ErrorCode = keyof typeof ERROR_CODES;
 

@@ -17,7 +17,9 @@ const DEFAULT_MESSAGES: Record<ErrorCode, string> = {
   OTP_LOCKED: 'Too many attempts. Try again later',
   RATE_LIMITED: 'Too many requests',
   MEDIA_REJECTED: 'The uploaded file was rejected',
+  HTTPS_REQUIRED: 'This API is only served over HTTPS/WSS',
   INTERNAL: 'Internal server error',
+  SERVICE_UNAVAILABLE: 'Service temporarily unavailable. Try again shortly',
 };
 
 /** Domain/application error carrying a stable, client-visible code. */

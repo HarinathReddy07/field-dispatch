@@ -7,6 +7,7 @@ import type { Env } from '@dispatch/config';
 import { AllExceptionsFilter } from './common/exception.filter';
 import { resolveCorrelationId } from './common/context';
 import { landingDocument } from './common/landing';
+import { requireHttps } from './common/transport';
 import { API_NAME, API_VERSION } from './common/version';
 import { RedisIoAdapter } from './modules/realtime/redis-io.adapter';
 
@@ -17,7 +18,8 @@ export async function configureApp(app: NestExpressApplication, env: Env): Promi
   app.useWebSocketAdapter(ws);
   app.setGlobalPrefix('api/v1', { exclude: ['health/live', 'health/ready'] });
   app.set('trust proxy', 1);
-  app.use(helmet());
+  app.use(helmet()); // includes HSTS; meaningful behind TLS
+  if (!env.INSECURE_LOCAL_DEV) app.use(requireHttps); // deployable profile: HTTPS/WSS only
   app.enableCors({
     origin: env.CORS_ORIGINS.split(',')
       .map((o) => o.trim())
