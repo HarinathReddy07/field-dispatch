@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   // The browser talks to the API only through our same-origin /api/proxy route (cookies stay httpOnly);
   // the socket connects straight to the API with a short-lived token from /api/session/token.
-  transpilePackages: ['@dispatch/contracts'],
+  transpilePackages: ['@dispatch/contracts', '@dispatch/ui-tokens'],
   turbopack: {
     rules: {
       '*.css': {
