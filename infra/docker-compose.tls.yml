@@ -1,0 +1,59 @@
+# HTTPS/WSS deployable profile. Layer it on top of the base stack:
+#
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.tls.yml --env-file .env up -d --build --wait
+#   (or: make tls-up)
+#
+# What changes versus the local-dev stack:
+#   - a TLS-terminating proxy (Caddy) is the ONLY published entry point (443/80); api, admin and storage are no longer
+#     published, so nothing can reach them over plain HTTP from outside the compose network
+#   - INSECURE_LOCAL_DEV=false: the API answers 426 to plain HTTP, refuses plain WS handshakes, requires https origins
+#   - admin session cookies are Secure; presigned storage URLs are https
+#
+# Variables (set in .env):  DOMAIN (default localhost -> api.localhost, admin.localhost, storage.localhost)
+#                           TLS_MODE (default internal = Caddy's local CA; an e-mail address = Let's Encrypt)
+# See docs/deploy-tls.md.
+services:
+  proxy:
+    image: caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      TLS_MODE: ${TLS_MODE:-internal}
+    ports:
+      - '443:443'
+      - '80:80'
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'caddy', 'validate', '--config', '/etc/caddy/Caddyfile']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api:
+    ports: !reset []
+    environment:
+      INSECURE_LOCAL_DEV: 'false'
+      CORS_ORIGINS: https://admin.${DOMAIN:-localhost}
+      S3_PUBLIC_ENDPOINT: https://storage.${DOMAIN:-localhost}
+
+  admin:
+    ports: !reset []
+    environment:
+      PUBLIC_API_URL: https://api.${DOMAIN:-localhost}
+      ADMIN_COOKIE_SECURE: 'true'
+
+  storage:
+    ports: !reset []
+
+volumes:
+  caddy_data:
+  caddy_config:

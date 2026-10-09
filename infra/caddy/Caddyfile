@@ -1,0 +1,33 @@
+# TLS-terminating reverse proxy for the deployable profile (infra/docker-compose.tls.yml, docs/deploy-tls.md).
+#
+#   DOMAIN     base domain; sites are api.$DOMAIN, admin.$DOMAIN, storage.$DOMAIN   (default: localhost)
+#   TLS_MODE   "internal" = Caddy's built-in local CA (trial/demo)  |  an e-mail address = Let's Encrypt (ACME)
+#
+# Caddy sets X-Forwarded-Proto for every proxied request, which is what the API checks to accept a request or a
+# WebSocket handshake as HTTPS/WSS. WebSocket upgrades (Socket.io) are proxied automatically.
+{
+	admin off
+}
+
+api.{$DOMAIN:localhost} {
+	tls {$TLS_MODE:internal}
+	encode zstd gzip
+	reverse_proxy api:3000 {
+		health_uri /health/ready
+		health_interval 10s
+	}
+}
+
+admin.{$DOMAIN:localhost} {
+	tls {$TLS_MODE:internal}
+	encode zstd gzip
+	reverse_proxy admin:3001
+}
+
+# Presigned evidence URLs point here: devices upload/download over HTTPS, signed against this exact host.
+storage.{$DOMAIN:localhost} {
+	tls {$TLS_MODE:internal}
+	reverse_proxy storage:9000 {
+		header_up Host {host}
+	}
+}
