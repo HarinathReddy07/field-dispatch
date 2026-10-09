@@ -84,9 +84,10 @@ describe('realtime (Socket.io)', () => {
     expect(types(admin!, id)).toEqual(
       expect.arrayContaining(['request.created', 'request.state.changed', 'assignment.created']),
     );
-    expect(types(r1!, id)).toEqual(expect.arrayContaining(['request.created', 'assignment.created']));
+    expect(types(r1!, id)).toEqual(expect.arrayContaining(['assignment.created']));
+    expect(types(r1!, id)).not.toContain('request.created'); // spec 8.2: request.created is Server -> admin only
     expect(types(t1!, id)).toEqual(expect.arrayContaining(['request.state.changed', 'assignment.created']));
-    expect(types(t1!, id)).not.toContain('request.created'); // admin/requester only
+    expect(types(t1!, id)).not.toContain('request.created'); // admin only
     // isolation: uninvolved users receive nothing about this job
     expect(types(t2!, id)).toEqual([]);
     expect(types(r2!, id)).toEqual([]);

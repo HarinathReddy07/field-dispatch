@@ -84,7 +84,7 @@ Every event is `{eventId, occurredAt, schemaVersion:1, seq, type, requestId, dat
 
 | Event (server → clients)      | Audience                                   | Data                                                  |
 | ----------------------------- | ------------------------------------------ | ----------------------------------------------------- |
-| `request.created`             | admin, requester                           | `{requestId, category, state}`                        |
+| `request.created`             | admin                                      | `{requestId, category, state}`                        |
 | `assignment.created`          | technician, requester, admin               | `{requestId, assignmentId, technicianId, quoteMinor}` |
 | `technician.location.updated` | admin + subscribed viewers of that request | `{requestId, technicianId, lat, lon, at}`             |
 | `request.state.changed`       | requester, technician, admin               | `{requestId, from, to, version}`                      |
