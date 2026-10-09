@@ -60,11 +60,12 @@ export class RequestsService {
       action: 'SUBMIT',
       actor: { id: user.id, role: 'REQUESTER' },
     });
-    await this.outbox.enqueue(tx, 'request.created', id, [rooms.admin], {
+    await this.outbox.enqueue(tx, 'request.created', id, [rooms.admin, rooms.user(user.id)], {
       requestId: id,
       category: dto.category,
       state: 'REQUESTED',
     });
+
     return id;
   }
 
