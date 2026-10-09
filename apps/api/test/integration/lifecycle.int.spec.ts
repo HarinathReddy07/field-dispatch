@@ -210,9 +210,8 @@ describe('job lifecycle', () => {
     expect(snap.status).toBe(200);
     expect(snap.body.request.state).toBe('CONFIRMED');
     const types = snap.body.events.map((e: { type: string }) => e.type);
-    expect(types).toEqual(
-      expect.arrayContaining(['request.created', 'request.state.changed', 'assignment.created']),
-    );
+    expect(types).toEqual(expect.arrayContaining(['request.state.changed', 'assignment.created']));
+    expect(types).not.toContain('request.created'); // spec 8.2: request.created is admin-only
     for (const e of snap.body.events) {
       expect(e).toMatchObject({ schemaVersion: 1 });
       expect(e.eventId).toMatch(/^[0-9a-f-]{36}$/);
