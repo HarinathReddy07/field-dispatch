@@ -3,43 +3,109 @@ name: ci
 on:
   push:
     branches: [master, main]
+    tags: ['v*']
   pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Same pinned images as infra/docker-compose.yml.
+  STORAGE_IMAGE: rustfs/rustfs:1.0.1@sha256:1803faef57627e2d9c2e7d89d655d712ddded5389040054987163043fecb6a3c
 
 jobs:
   verify:
+    name: lint, typecheck, unit, integration, e2e
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     services:
       postgres:
-        image: postgis/postgis:16-3.4
+        image: postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
         env:
           POSTGRES_PASSWORD: ci
         ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
       redis:
-        image: redis:7-alpine
+        image: redis:7.4.11-alpine3.21@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
         ports: ['6379:6379']
         options: >-
           --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
     env:
       TEST_ADMIN_DATABASE_URL: postgres://postgres:ci@localhost:5432/postgres
       TEST_REDIS_URL: redis://localhost:6379
+      TEST_S3_ENDPOINT: http://localhost:9000
+      TEST_S3_ACCESS_KEY: ciaccesskey
+      TEST_S3_SECRET_KEY: cisecretkey1234567
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm install -g pnpm@12.10.1
+      # S3-compatible storage service container (a service container cannot take a command or args, so start it here).
+      - name: Start S3-compatible storage
+        run: |
+          docker run -d --name storage -p 9000:9000 \
+            -e RUSTFS_ACCESS_KEY="$TEST_S3_ACCESS_KEY" -e RUSTFS_SECRET_KEY="$TEST_S3_SECRET_KEY" \
+            "$STORAGE_IMAGE"
+          for i in $(seq 1 30); do curl -fsS http://localhost:9000/health && break || sleep 2; done
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
+      - name: Unit + integration (real PostgreSQL/PostGIS, Redis and S3-compatible storage)
+        run: pnpm test
       - name: Coverage gate (domain + dispatch >= 90%)
         run: pnpm --filter @dispatch/api test:cov
-      - name: Acceptance scenarios A1-A7
+      - name: Acceptance scenarios A1-A7 (make e2e)
         run: pnpm --filter @dispatch/api test:e2e
 
+  docker-clean-start:
+    name: clean start from the README (docker compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: make up (creates .env with generated secrets, builds, waits for healthy)
+        run: make up
+      - name: make seed
+        run: make seed
+      - name: API, admin and storage answer
+        run: |
+          curl -fsS http://localhost:3000/health/ready
+          curl -fsS -o /dev/null -w "admin /login -> %{http_code}\n" http://localhost:3001/login
+          set -a; . ./.env; set +a
+          curl -fsS -X POST http://localhost:3000/api/v1/auth/login -H 'content-type: application/json' \
+            -d '{"email":"admin@dispatch.test","password":"'"$SEED_PASSWORD"'"}' | head -c 120; echo
+      - name: Restart resilience (A7) and graceful shutdown
+        run: |
+          docker compose -f infra/docker-compose.yml --env-file .env stop -t 20 api
+          code=$(docker compose -f infra/docker-compose.yml --env-file .env ps -a api --format '{{.ExitCode}}')
+          echo "api exit code after SIGTERM: $code"; test "$code" = "0"
+          docker compose -f infra/docker-compose.yml --env-file .env up -d --wait api
+          curl -fsS http://localhost:3000/health/ready
+      - name: Container hardening (non-root, healthy)
+        run: |
+          for s in api admin storage postgres redis; do
+            cid=$(docker compose -f infra/docker-compose.yml --env-file .env ps -q $s)
+            echo "$s user=$(docker inspect -f '{{.Config.User}}' $cid) health=$(docker inspect -f '{{.State.Health.Status}}' $cid)"
+          done
+          test "$(docker inspect -f '{{.Config.User}}' $(docker compose -f infra/docker-compose.yml --env-file .env ps -q api))" = "node"
+      - name: TLS profile config is valid
+        run: make tls-config
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g pnpm@12.10.1 && pnpm install --frozen-lockfile
+      - name: make e2e (Testcontainers starts its own PostgreSQL, Redis and storage)
+        run: make e2e
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose -f infra/docker-compose.yml --env-file .env logs --no-color --tail=200
+
   audit:
+    name: dependency audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,3 +115,14 @@ jobs:
       - run: npm install -g pnpm@12.10.1
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --prod --audit-level high
+
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
