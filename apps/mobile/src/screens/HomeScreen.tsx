@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RequestView } from '@dispatch/contracts';
 import { useActive, useAvailability } from '../api/hooks';
 import type { ApiError } from '../api/client';
 import { stateUi } from '../lib/state-ui';
-import type { RootStackParams } from '../navigation/types';
+import type { RootStackParams, TabParams } from '../navigation/types';
 import { useSession } from '../state/session';
 import { stateStyle } from '@dispatch/ui-tokens';
 import {
@@ -23,7 +25,10 @@ import {
   money,
 } from '../ui/components';
 
-type Props = NativeStackScreenProps<RootStackParams, 'Home'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<TabParams, 'Home'>,
+  NativeStackScreenProps<RootStackParams>
+>;
 
 export function HomeScreen(props: Props) {
   const user = useSession((s) => s.user);
@@ -94,7 +99,11 @@ function RequesterHome({ navigation }: Props) {
   return (
     <Screen onRefresh={() => void active.refetch()} refreshing={active.isRefetching}>
       <Title>Your requests</Title>
-      <Button label="New request" onPress={() => navigation.navigate('CreateRequest')} />
+      <Button
+        label="New request"
+        icon="add-circle-outline"
+        onPress={() => navigation.navigate('CreateRequest')}
+      />
       {active.isPending ? (
         <Loading />
       ) : active.isError ? (
@@ -104,7 +113,6 @@ function RequesterHome({ navigation }: Props) {
       ) : (
         active.data.map((j) => <JobCard key={j.id} job={j} role="REQUESTER" onPress={() => go(j)} />)
       )}
-      <Button label="History and receipts" variant="ghost" onPress={() => navigation.navigate('History')} />
       <Button label="Sign out" variant="ghost" onPress={signOut} />
     </Screen>
   );
@@ -168,7 +176,6 @@ function TechnicianHome({ navigation }: Props) {
           />
         ))
       )}
-      <Button label="Completed jobs" variant="ghost" onPress={() => navigation.navigate('History')} />
       <Button label="Sign out" variant="ghost" onPress={signOut} />
     </Screen>
   );

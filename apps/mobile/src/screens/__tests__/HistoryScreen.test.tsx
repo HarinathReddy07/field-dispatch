@@ -50,7 +50,7 @@ describe('history screen', () => {
 
     await fireEvent.press(screen.getByLabelText('Order again'));
     await waitFor(() => expect(reorder.mutateAsync).toHaveBeenCalledWith('r1'));
-    expect(navigation.replace).toHaveBeenCalledWith('Nearby', { requestId: 'fresh-1' });
+    expect(navigation.navigate).toHaveBeenCalledWith('Nearby', { requestId: 'fresh-1' });
   });
 
   it('technician: sees completed jobs but no requester-only "Order again" control', async () => {
@@ -88,7 +88,7 @@ describe('history screen', () => {
     await render(<HistoryScreen navigation={navigation as never} route={route} />);
     await fireEvent.press(screen.getByLabelText('Order again'));
     expect(screen.getByText('Resource not found')).toBeTruthy();
-    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(navigation.navigate).not.toHaveBeenCalledWith('Nearby', expect.anything());
   });
 
   it('shows loading, empty and error states', async () => {

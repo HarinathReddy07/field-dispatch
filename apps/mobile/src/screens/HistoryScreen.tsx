@@ -1,11 +1,16 @@
 import { Pressable, View } from 'react-native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHistory, useReorder } from '../api/hooks';
-import type { RootStackParams } from '../navigation/types';
+import type { RootStackParams, TabParams } from '../navigation/types';
 import { useSession } from '../state/session';
 import { Badge, Body, Button, Card, Empty, ErrorBox, Loading, Screen, Title, money } from '../ui/components';
 
-type Props = NativeStackScreenProps<RootStackParams, 'History'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<TabParams, 'History'>,
+  NativeStackScreenProps<RootStackParams>
+>;
 
 export function HistoryScreen({ navigation }: Props) {
   const role = useSession((s) => s.user?.role);
@@ -15,7 +20,7 @@ export function HistoryScreen({ navigation }: Props) {
   const again = async (id: string) => {
     try {
       const fresh = await reorder.mutateAsync(id); // new request prefilled from the old one (server-side)
-      navigation.replace('Nearby', { requestId: fresh.id });
+      navigation.navigate('Nearby', { requestId: fresh.id });
     } catch {
       /* shown below */
     }

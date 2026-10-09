@@ -1,23 +1,29 @@
 import { useEffect } from 'react';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  useFonts,
+} from '@expo-google-fonts/inter';
 import { StatusBar } from 'expo-status-bar';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiError } from './src/api/client';
+import { MainTabs } from './src/navigation/MainTabs';
 import type { RootStackParams } from './src/navigation/types';
 import { useLiveEvents } from './src/realtime/live';
 import { BookingScreen } from './src/screens/BookingScreen';
 import { CreateRequestScreen } from './src/screens/CreateRequestScreen';
-import { HistoryScreen } from './src/screens/HistoryScreen';
-import { HomeScreen } from './src/screens/HomeScreen';
 import { JobScreen } from './src/screens/JobScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { NearbyScreen } from './src/screens/NearbyScreen';
 import { ReceiptScreen } from './src/screens/ReceiptScreen';
 import { useSession } from './src/state/session';
 import { Body, ErrorBox, Loading, Screen } from './src/ui/components';
-import { useTheme } from './src/ui/theme';
+import { fonts, useTheme } from './src/ui/theme';
 
 const Stack = createNativeStackNavigator<RootStackParams>();
 
@@ -60,12 +66,10 @@ function Root() {
   if (status === 'anon' || !user) return <LoginScreen />;
 
   return (
-    <Stack.Navigator screenOptions={{ headerShadowVisible: false, headerTitleStyle: { fontWeight: '600' } }}>
-      <Stack.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ title: user.role === 'TECHNICIAN' ? 'Technician' : 'Requester' }}
-      />
+    <Stack.Navigator
+      screenOptions={{ headerShadowVisible: false, headerTitleStyle: { fontFamily: fonts.semibold } }}
+    >
+      <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
       <Stack.Screen name="CreateRequest" component={CreateRequestScreen} options={{ title: 'New request' }} />
       <Stack.Screen name="Nearby" component={NearbyScreen} options={{ title: 'Nearby technicians' }} />
       <Stack.Screen
@@ -74,7 +78,6 @@ function Root() {
         options={{ title: 'Booking', headerBackVisible: false }}
       />
       <Stack.Screen name="Job" component={JobScreen} options={{ title: 'Job' }} />
-      <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'History' }} />
       <Stack.Screen name="Receipt" component={ReceiptScreen} options={{ title: 'Receipt' }} />
     </Stack.Navigator>
   );
@@ -82,6 +85,13 @@ function Root() {
 
 export default function App() {
   const { scheme, c } = useTheme();
+  // Inter (one file per weight). If a font fails to load the app still renders with the system font.
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const navTheme = {
     ...base,
@@ -95,6 +105,7 @@ export default function App() {
       notification: c.primary,
     },
   };
+  if (!fontsLoaded && !fontError) return null; // brief: the native splash screen stays visible
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
