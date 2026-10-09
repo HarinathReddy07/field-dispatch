@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Pool } from 'pg';
@@ -55,13 +55,23 @@ export interface TestAppOptions {
   logLevel?: string;
 }
 
+let appCounter = 0;
+/**
+ * Redis has 16 logical databases. Each Jest worker (maxWorkers: 3) owns a block of five, so concurrent suites
+ * (and several apps inside one suite) never share a keyspace, even though every app flushes its own on startup.
+ */
+function nextRedisDb(): number {
+  const worker = (Number(process.env.JEST_WORKER_ID ?? '1') - 1) % 3;
+  return worker * 5 + (appCounter++ % 5) + 1;
+}
+
 export async function createTestApp(opts: TestAppOptions = {}): Promise<TestCtx> {
   const db = opts.db ?? (await createTestDatabase());
   if (!opts.db && opts.seedData !== false) await seed(db.url);
 
   const redisBase = process.env.TEST_REDIS_URL;
   if (!redisBase) throw new Error('TEST_REDIS_URL is not set (global setup did not run)');
-  const redisUrl = `${redisBase.replace(/\/\d*$/, '')}/${randomInt(1, 15)}`;
+  const redisUrl = `${redisBase.replace(/\/\d*$/, '')}/${nextRedisDb()}`;
 
   const env = loadEnv({
     NODE_ENV: 'test',
@@ -74,6 +84,7 @@ export async function createTestApp(opts: TestAppOptions = {}): Promise<TestCtx>
     S3_ACCESS_KEY: 'test-key',
     S3_SECRET_KEY: 'test-secret',
     STORAGE_PROVIDER: 'memory',
+    INSECURE_LOCAL_DEV: 'true', // tests speak plain HTTP; transport.int.spec.ts covers the deployable profile
     BACKGROUND_JOBS: 'false',
     THROTTLE_DEFAULT_PER_MIN: '1000000',
     THROTTLE_LOGIN_PER_MIN: '100000',

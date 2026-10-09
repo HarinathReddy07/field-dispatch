@@ -78,23 +78,33 @@ describe('auth', () => {
       const statuses: number[] = [];
       for (let i = 0; i < 12; i++) statuses.push((await attempt()).status);
       expect(statuses.slice(0, 8).every((s) => s === 401)).toBe(true);
-      expect(statuses.slice(8).every((s) => s === 429)).toBe(true);
+      expect(statuses).toEqual([...Array(8).fill(401), ...Array(4).fill(429)]);
       expect((await attempt()).body.code).toBe('RATE_LIMITED');
     } finally {
       await limited.close();
     }
   });
 
-  it('serves liveness/readiness and swagger', async () => {
+  it('serves liveness/readiness', async () => {
     expect((await ctx.http().get('/health/live')).status).toBe(200);
     const ready = await ctx.http().get('/health/ready');
     expect(ready.status).toBe(200);
     expect(ready.body.checks).toEqual({ database: true, redis: true });
-    const docs = await ctx.http().get('/api/docs-json');
-    expect(docs.status).toBe(200);
-    expect(Object.keys(docs.body.paths)).toEqual(
-      expect.arrayContaining(['/api/v1/requests', '/api/v1/requests/{id}/confirm']),
-    );
+  });
+
+  it('exposes OpenAPI/Swagger only when SWAGGER_ENABLED=true (off by default)', async () => {
+    expect((await ctx.http().get('/api/docs-json')).status).toBe(404);
+    expect((await ctx.http().get('/api/docs')).status).toBe(404);
+    const withDocs = await createTestApp({ env: { SWAGGER_ENABLED: 'true' }, seedData: false });
+    try {
+      const docs = await withDocs.http().get('/api/docs-json');
+      expect(docs.status).toBe(200);
+      expect(Object.keys(docs.body.paths)).toEqual(
+        expect.arrayContaining(['/api/v1/requests', '/api/v1/requests/{id}/confirm']),
+      );
+    } finally {
+      await withDocs.close();
+    }
   });
 
   it('technician availability and location ingestion', async () => {

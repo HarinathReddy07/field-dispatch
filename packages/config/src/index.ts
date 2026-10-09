@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const bool = z.enum(['true', 'false']).transform((v) => v === 'true');
 
-export const EnvSchema = z.object({
+const BaseEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().default(3000),
   DATABASE_URL: z.string().url(),
@@ -37,17 +37,58 @@ export const EnvSchema = z.object({
   S3_SECRET_KEY: z.string().min(1),
   S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().positive().default(300),
   STORAGE_PROVIDER: z.enum(['minio', 'memory']).default('minio'),
-  SWAGGER_ENABLED: bool.default('true'),
+  /** OpenAPI/Swagger UI at /api/docs. Off unless explicitly enabled. */
+  SWAGGER_ENABLED: bool.default('false'),
+  /**
+   * Plain HTTP/WS is allowed ONLY when this is true (local development / the trial docker-compose profile).
+   * Default false = deployable profile: the API refuses non-HTTPS requests and non-WSS socket handshakes
+   * (TLS is terminated by a reverse proxy that sets X-Forwarded-Proto), and https origins are required.
+   */
+  INSECURE_LOCAL_DEV: bool.default('false'),
   /** Outbox publisher + review sweeper. Tests may disable and drive them manually. */
   BACKGROUND_JOBS: bool.default('true'),
+});
+
+const isHttps = (u: string): boolean => /^https:\/\//i.test(u.trim());
+
+export const EnvSchema = BaseEnvSchema.superRefine((env, ctx) => {
+  if (env.NODE_ENV === 'production' && env.STORAGE_PROVIDER === 'memory') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['STORAGE_PROVIDER'],
+      message: 'the in-memory storage mock must not be used when NODE_ENV=production',
+    });
+  }
+  if (env.INSECURE_LOCAL_DEV) return;
+  // Deployable profile: every browser/device-facing address must be HTTPS/WSS.
+  for (const origin of env.CORS_ORIGINS.split(',').filter((o) => o.trim())) {
+    if (!isHttps(origin)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['CORS_ORIGINS'],
+        message: 'must list https:// origins only (or set INSECURE_LOCAL_DEV=true for local development)',
+      });
+      break;
+    }
+  }
+  if (env.S3_PUBLIC_ENDPOINT && !isHttps(env.S3_PUBLIC_ENDPOINT)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['S3_PUBLIC_ENDPOINT'],
+      message: 'presigned URLs handed to devices must be https:// (or set INSECURE_LOCAL_DEV=true)',
+    });
+  }
 });
 export type Env = z.infer<typeof EnvSchema>;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const parsed = EnvSchema.safeParse(source);
   if (!parsed.success) {
-    const keys = parsed.error.issues.map((i) => i.path.join('.')).join(', ');
-    throw new Error(`Invalid environment configuration: ${keys}`);
+    // Names and reasons only: never echo values (they may be secrets).
+    const lines = parsed.error.issues.map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`);
+    throw new Error(
+      `Invalid environment configuration:\n${lines.join('\n')}\nSee .env.example for every variable.`,
+    );
   }
   return parsed.data;
 }
