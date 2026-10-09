@@ -11,7 +11,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.example.fielddispatch",
       "infoPlist": {
-        "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true }
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {
@@ -36,7 +38,15 @@
           "photosPermission": "Field Dispatch reads a photo only when you choose one as inspection evidence."
         }
       ],
-      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }]
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-font"
     ]
   }
 }

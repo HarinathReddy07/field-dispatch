@@ -102,7 +102,7 @@ export function CreateRequestScreen({ navigation }: Props) {
       </Card>
       <Field label="Notes (optional)" value={notes} onChangeText={setNotes} multiline maxLength={1000} />
       {create.isError ? <ErrorBox error={create.error} /> : null}
-      <Button label="Find technicians" busy={create.isPending} onPress={submit} />
+      <Button label="Find technicians" icon="search-outline" busy={create.isPending} onPress={submit} />
     </Screen>
   );
 }

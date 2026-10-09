@@ -38,7 +38,11 @@ export function BookingScreen({ route, navigation }: Props) {
       <Body>
         The technician has been notified instantly. Share the arrival code when they reach your site.
       </Body>
-      <Button label="Track this job" onPress={() => navigation.replace('Job', { requestId })} />
+      <Button
+        label="Track this job"
+        icon="locate-outline"
+        onPress={() => navigation.replace('Job', { requestId })}
+      />
     </Screen>
   );
 }

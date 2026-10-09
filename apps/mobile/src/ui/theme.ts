@@ -22,3 +22,17 @@ export function useTheme(): ThemeValue {
   const scheme: ThemeName = useColorScheme() === 'dark' ? 'dark' : 'light';
   return { scheme, c: colors[scheme] };
 }
+
+/**
+ * Inter ships one file per weight. React Native on Android ignores `fontWeight` for custom families, so components
+ * choose the family by weight instead (see `fontFor`). The files are loaded once in App.tsx.
+ */
+export const fonts = {
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+} as const;
+
+export const fontFor = (weight: '400' | '500' | '600' | '700' = '400'): string =>
+  ({ '400': fonts.regular, '500': fonts.medium, '600': fonts.semibold, '700': fonts.bold })[weight];

@@ -8,12 +8,14 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
+  Text as NativeText,
+  TextInput as NativeTextInput,
   View,
   type TextInputProps,
+  type TextProps,
   type TextStyle,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { JOURNEY_STEPS, formatMoney, journeyOf, stateStyle } from '@dispatch/ui-tokens';
 import { ApiError } from '../api/client';
@@ -21,9 +23,33 @@ import type { Tone } from '../lib/state-ui';
 import { elapsedSeconds, formatClock } from '../lib/timer';
 import { useNow } from '../lib/useNow';
 import { useUi } from '../state/ui';
-import { theme, useTheme } from './theme';
+import { fontFor, fonts, theme, useTheme } from './theme';
 
 const TABULAR: TextStyle = { fontVariant: ['tabular-nums'] };
+
+/** Inter by default everywhere; a style that sets its own fontFamily (e.g. monospace for codes) wins. */
+export function Text({ style, ...rest }: TextProps) {
+  return <NativeText {...rest} style={[{ fontFamily: fonts.regular }, style]} />;
+}
+function TextInput({ style, ...rest }: TextInputProps) {
+  return <NativeTextInput {...rest} style={[{ fontFamily: fonts.regular }, style]} />;
+}
+
+export type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+/** Decorative icon (the label next to it carries the meaning, so it is hidden from screen readers). */
+export function Icon({ name, size = 20, color }: { name: IconName; size?: number; color?: string }) {
+  const { c } = useTheme();
+  return (
+    <Ionicons
+      name={name}
+      size={size}
+      color={color ?? c.text}
+      accessible={false}
+      importantForAccessibility="no"
+    />
+  );
+}
 
 export const money = (minor: number | null | undefined): string => formatMoney(minor);
 
@@ -85,7 +111,7 @@ export function Card({ title, children }: { title?: string; children: React.Reac
       {title ? (
         <Text
           accessibilityRole="header"
-          style={{ fontSize: theme.font.body, fontWeight: '600', color: c.text }}
+          style={{ fontSize: theme.font.body, fontFamily: fontFor('600'), color: c.text }}
         >
           {title}
         </Text>
@@ -111,7 +137,7 @@ export function Body({
     <Text
       style={[
         { fontSize: theme.font.body, lineHeight: 24, color: soft ? c.textMuted : c.text },
-        strong && { fontWeight: '700' },
+        strong && { fontFamily: fontFor('700') },
         mono && [TABULAR, { fontFamily: 'monospace' }],
       ]}
     >
@@ -125,7 +151,7 @@ export const Title = ({ children }: { children: React.ReactNode }) => {
   return (
     <Text
       accessibilityRole="header"
-      style={{ fontSize: theme.font.display, lineHeight: 34, fontWeight: '700', color: c.text }}
+      style={{ fontSize: theme.font.display, lineHeight: 34, fontFamily: fontFor('700'), color: c.text }}
     >
       {children}
     </Text>
@@ -158,8 +184,10 @@ export function Button({
   busy = false,
   disabled = false,
   accessibilityHint,
+  icon,
 }: {
   label: string;
+  icon?: IconName;
   onPress: () => void | Promise<unknown>;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   busy?: boolean;
@@ -214,7 +242,10 @@ export function Button({
       {busy || running ? (
         <ActivityIndicator color={ink} />
       ) : (
-        <Text style={{ fontSize: theme.font.body, fontWeight: '600', color: ink }}>{label}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.sm }}>
+          {icon ? <Icon name={icon} size={20} color={ink} /> : null}
+          <Text style={{ fontSize: theme.font.body, fontFamily: fontFor('600'), color: ink }}>{label}</Text>
+        </View>
       )}
     </Pressable>
   );
@@ -247,7 +278,7 @@ function Pill({ bg, text, label }: { bg: string; text: string; label: string }) 
       }}
     >
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: text }} />
-      <Text style={{ fontSize: theme.font.caption, fontWeight: '600', color: text }}>{label}</Text>
+      <Text style={{ fontSize: theme.font.caption, fontFamily: fontFor('600'), color: text }}>{label}</Text>
     </View>
   );
 }
@@ -350,7 +381,15 @@ export function Loading({ label = 'Loading…' }: { label?: string }) {
   );
 }
 
-export function Empty({ title, hint }: { title: string; hint?: string }) {
+export function Empty({
+  title,
+  hint,
+  icon = 'file-tray-outline',
+}: {
+  title: string;
+  hint?: string;
+  icon?: IconName;
+}) {
   const { c } = useTheme();
   return (
     <View
@@ -364,7 +403,8 @@ export function Empty({ title, hint }: { title: string; hint?: string }) {
         borderRadius: theme.radius.md,
       }}
     >
-      <Text style={{ fontSize: theme.font.body, fontWeight: '600', color: c.text }}>{title}</Text>
+      <Icon name={icon} size={28} color={c.textMuted} />
+      <Text style={{ fontSize: theme.font.body, fontFamily: fontFor('600'), color: c.text }}>{title}</Text>
       {hint ? (
         <Text style={{ fontSize: theme.font.small, color: c.textMuted, textAlign: 'center' }}>{hint}</Text>
       ) : null}
@@ -393,8 +433,11 @@ export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => v
         gap: theme.space.sm,
       }}
     >
-      <Text style={{ color: c.danger, fontSize: theme.font.body }}>{message}</Text>
-      {onRetry ? <Button label="Retry" variant="secondary" onPress={onRetry} /> : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.sm }}>
+        <Icon name={offline ? 'cloud-offline-outline' : 'alert-circle-outline'} size={20} color={c.danger} />
+        <Text style={{ color: c.danger, fontSize: theme.font.body, flexShrink: 1 }}>{message}</Text>
+      </View>
+      {onRetry ? <Button label="Retry" variant="secondary" icon="refresh" onPress={onRetry} /> : null}
     </View>
   );
 }
@@ -428,7 +471,9 @@ export function Field({ label, error, ...input }: TextInputProps & { label: stri
   const { c } = useTheme();
   return (
     <View style={{ gap: theme.space.xs }}>
-      <Text style={{ fontSize: theme.font.small, fontWeight: '500', color: c.textMuted }}>{label}</Text>
+      <Text style={{ fontSize: theme.font.small, fontFamily: fontFor('500'), color: c.textMuted }}>
+        {label}
+      </Text>
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={c.textSubtle}
@@ -491,7 +536,7 @@ export function OtpInput({
                   backgroundColor: c.surface,
                 }}
               >
-                <Text style={[{ fontSize: 24, fontWeight: '600', color: c.text }, TABULAR]}>
+                <Text style={[{ fontSize: 24, fontFamily: fontFor('600'), color: c.text }, TABULAR]}>
                   {value[i] ?? ''}
                 </Text>
               </View>
@@ -541,7 +586,7 @@ export function ElapsedTimer({
   return (
     <Text
       accessibilityLabel={`Elapsed ${text}`}
-      style={[{ fontSize: size, fontWeight: '700', color: c.text, fontFamily: 'monospace' }, TABULAR]}
+      style={[{ fontSize: size, fontFamily: fontFor('700'), color: c.text }, TABULAR]}
     >
       {text}
     </Text>
@@ -574,7 +619,9 @@ export function Chip({
         backgroundColor: selected ? c.primarySoft : c.surface,
       }}
     >
-      <Text style={{ color: c.text, fontSize: theme.font.body, fontWeight: selected ? '600' : '400' }}>
+      <Text
+        style={{ color: c.text, fontSize: theme.font.body, fontFamily: fontFor(selected ? '600' : '400') }}
+      >
         {label}
       </Text>
     </Pressable>
@@ -673,7 +720,7 @@ export function ReasonSheet({
         >
           <Text
             accessibilityRole="header"
-            style={{ fontSize: theme.font.heading, fontWeight: '600', color: c.text }}
+            style={{ fontSize: theme.font.heading, fontFamily: fontFor('600'), color: c.text }}
           >
             {title}
           </Text>

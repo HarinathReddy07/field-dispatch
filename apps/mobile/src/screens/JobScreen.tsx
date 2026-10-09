@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Image, Linking, Text, View } from 'react-native';
+import { Alert, Image, Linking, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ArriveSchema, type Role } from '@dispatch/contracts';
@@ -41,6 +41,7 @@ import {
   Screen,
   StateStepper,
   StatusBadge,
+  Text,
   Title,
   money,
 } from '../ui/components';
@@ -96,7 +97,11 @@ export function JobScreen({ route, navigation }: Props) {
       <WorkTimer job={job} />
 
       {actions.includes('FIND_TECHNICIAN') || actions.includes('PICK_TECHNICIAN') ? (
-        <Button label="Find technicians" onPress={() => navigation.navigate('Nearby', { requestId })} />
+        <Button
+          label="Find technicians"
+          icon="search-outline"
+          onPress={() => navigation.navigate('Nearby', { requestId })}
+        />
       ) : null}
       {role === 'REQUESTER' && actions.includes('SHOW_OTP') && <RequesterArrival job={job} />}
       {role === 'TECHNICIAN' && actions.includes('ENTER_OTP') && <TechnicianArrival job={job} />}
@@ -104,7 +109,11 @@ export function JobScreen({ route, navigation }: Props) {
       {role === 'TECHNICIAN' && actions.includes('UPLOAD_EVIDENCE') && <EvidencePanel job={job} />}
       {role === 'REQUESTER' && actions.includes('REVIEW') && <ReviewPanel job={job} />}
       {actions.includes('RECEIPT') && (
-        <Button label="View receipt" onPress={() => navigation.navigate('Receipt', { requestId })} />
+        <Button
+          label="View receipt"
+          icon="receipt-outline"
+          onPress={() => navigation.navigate('Receipt', { requestId })}
+        />
       )}
       {actions.includes('CANCEL') && role === 'REQUESTER' && (
         <CancelButton job={job} onDone={() => navigation.popToTop()} />
@@ -126,7 +135,9 @@ function AssignmentCard({ job }: { job: LiveRequest }) {
       </KeyValue>
       {job.notes ? <KeyValue label="Notes">{job.notes}</KeyValue> : null}
       <KeyValue label="Quote">{money(job.quoteMinor)}</KeyValue>
-      {!isFinished(job.state) && <Button label="Navigate to site" variant="secondary" onPress={navigate} />}
+      {!isFinished(job.state) && (
+        <Button label="Navigate to site" variant="secondary" icon="navigate-outline" onPress={navigate} />
+      )}
       {__DEV__ && <SimulateDrive job={job} />}
     </Card>
   );
@@ -224,6 +235,7 @@ function RequesterArrival({ job }: { job: LiveRequest }) {
       ) : null}
       {issue.isError ? <ErrorBox error={issue.error} /> : null}
       <Button
+        icon="qr-code-outline"
         label={issue.data && left !== 0 ? 'Get a new code' : 'Show arrival code'}
         busy={issue.isPending}
         onPress={() => issue.mutateAsync().catch(() => undefined)}
@@ -259,7 +271,7 @@ function TechnicianArrival({ job }: { job: LiveRequest }) {
     <Card title="Arrival code">
       <Body soft>Ask the customer for the 6-digit code.</Body>
       <OtpInput value={otp} onChange={setOtp} error={error} />
-      <Button label="Confirm arrival" onPress={submit} />
+      <Button label="Confirm arrival" icon="key-outline" onPress={submit} />
     </Card>
   );
 }
@@ -271,6 +283,7 @@ function StartPanel({ job }: { job: LiveRequest }) {
       {start.isError ? <ErrorBox error={start.error} /> : null}
       <Button
         label="Start inspection"
+        icon="play-outline"
         busy={start.isPending}
         onPress={() => start.mutateAsync().catch(() => undefined)}
       />
@@ -315,7 +328,7 @@ function EvidencePanel({ job }: { job: LiveRequest }) {
         />
       ))}
       {pickError ? <InlineAlert>{pickError}</InlineAlert> : null}
-      <Button label="Take a photo" variant="secondary" onPress={() => capture(true)} />
+      <Button label="Take a photo" variant="secondary" icon="camera-outline" onPress={() => capture(true)} />
       {__DEV__ && <Button label="Pick from gallery (dev)" variant="ghost" onPress={() => capture(false)} />}
       {stop.isError ? <ErrorBox error={stop.error} /> : null}
       <Button
@@ -377,8 +390,13 @@ function ReviewPanel({ job }: { job: LiveRequest }) {
         </View>
       )}
       {review.isError ? <ErrorBox error={review.error} /> : null}
-      <Button label="Approve" busy={review.isPending} onPress={approve} />
-      <Button label="Request rework" variant="secondary" onPress={() => setSheet(true)} />
+      <Button label="Approve" icon="checkmark-circle-outline" busy={review.isPending} onPress={approve} />
+      <Button
+        label="Request rework"
+        variant="secondary"
+        icon="construct-outline"
+        onPress={() => setSheet(true)}
+      />
       <ReasonSheet
         visible={sheet}
         title="Request rework"

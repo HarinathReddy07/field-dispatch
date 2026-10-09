@@ -46,7 +46,7 @@ export function LoginScreen() {
           textContentType="password"
         />
         {error ? <InlineAlert>{error}</InlineAlert> : null}
-        <Button label="Sign in" onPress={submit} />
+        <Button label="Sign in" icon="log-in-outline" onPress={submit} />
       </Card>
     </Screen>
   );
