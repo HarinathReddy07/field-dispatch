@@ -14,7 +14,8 @@ export function proxy(req: NextRequest) {
     pathname === '/unauthorized' ||
     pathname === '/api/session/login' ||
     pathname === '/api/session/otp' ||
-    pathname === '/api/session/logout';
+    pathname === '/api/session/logout' ||
+    /\.(jpe?g|png|gif|svg|webp|ico|woff2?)$/i.test(pathname);
   if (open) return NextResponse.next();
 
   const hasSession = req.cookies.has(ACCESS_COOKIE) || req.cookies.has(REFRESH_COOKIE);
