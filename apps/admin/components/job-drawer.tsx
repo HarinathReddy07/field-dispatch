@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import type { AdminJobDetail, AdminTechnician, EvidenceItem } from '@dispatch/contracts';
+import Link from 'next/link';
+import { useState } from 'react';
+import type { AdminJobDetail, AdminTechnician } from '@dispatch/contracts';
 import { ApiError, api } from '@/lib/client';
 import { useNow, useQuery } from '@/hooks/use-query';
 import { TERMINAL, humanize, timeAgo } from '@/lib/format.ts';
+import { EvidenceGrid } from './evidence-grid';
 import { useLiveRefresh } from './live-provider';
 import {
   Badge,
   Button,
+  Card,
   ConfirmDialog,
   CopyButton,
   Drawer,
@@ -18,6 +21,7 @@ import {
   FlagChip,
   KeyValueRow,
   Money,
+  PageHeader,
   Select,
   Skeleton,
   StateStepper,
@@ -49,62 +53,39 @@ function ActionError({ error }: { error: ApiError | Error }) {
   );
 }
 
-/** Evidence grouped by work cycle. Signed URLs are short-lived: an expired/failed image triggers a refetch. */
-function EvidenceGrid({ items, onExpired }: { items: EvidenceItem[]; onExpired: () => void }) {
-  const cycles = useMemo(() => {
-    const byCycle = new Map<number, EvidenceItem[]>();
-    for (const e of items) byCycle.set(e.workCycle, [...(byCycle.get(e.workCycle) ?? []), e]);
-    return [...byCycle.entries()].sort((a, b) => a[0] - b[0]);
-  }, [items]);
+type FrameProps = {
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  onClose: () => void;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+};
 
-  // refetch shortly before the earliest signed URL expires
-  useEffect(() => {
-    if (items.length === 0) return;
-    const soonest = Math.min(...items.map((e) => Date.parse(e.expiresAt)));
-    const ms = Math.max(5_000, soonest - Date.now() - 10_000);
-    const t = setTimeout(onExpired, ms);
-    return () => clearTimeout(t);
-  }, [items, onExpired]);
-
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        title="No evidence yet"
-        hint="Photos appear here as soon as the technician finalizes them."
-      />
-    );
-  }
+/** Full-page frame with the same props as Drawer, so the job detail renders in either. */
+function PageFrame({ title, subtitle, children, footer }: FrameProps) {
   return (
-    <div className="space-y-5">
-      {cycles.map(([cycle, list]) => (
-        <section key={cycle} aria-label={`Work cycle ${cycle}`}>
-          <h3 className="mb-2 text-sm font-semibold">
-            Work cycle {cycle} <span className="font-normal text-muted">({list.length} photos)</span>
-          </h3>
-          <ul className="grid grid-cols-3 gap-2">
-            {list.map((e, i) => (
-              <li key={e.id}>
-                <a href={e.url} target="_blank" rel="noreferrer" className="block">
-                  {/* short-lived signed URL straight from storage */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={e.url}
-                    alt={`Evidence photo ${i + 1}, work cycle ${cycle}`}
-                    loading="lazy"
-                    onError={onExpired}
-                    className="aspect-square w-full rounded-sm border border-line bg-surface-muted object-cover"
-                  />
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+    <div className="space-y-4">
+      <PageHeader
+        title={typeof title === 'string' ? title : 'Job'}
+        breadcrumbs={[{ label: 'Live board', href: '/admin/live' }, { label: 'Job details' }]}
+        actions={footer ? <div className="flex flex-wrap gap-2">{footer}</div> : undefined}
+      />
+      {subtitle}
+      <Card bodyClassName="p-0">{children}</Card>
     </div>
   );
 }
 
-export function JobDrawer({ id, onClose }: { id: string; onClose: () => void }) {
+/** Job detail for admins: a right-hand drawer on the live board, or a shareable full page (mode="page"). */
+export function JobDrawer({
+  id,
+  onClose = () => undefined,
+  mode = 'drawer',
+}: {
+  id: string;
+  onClose?: () => void;
+  mode?: 'drawer' | 'page';
+}) {
   const detail = useQuery<AdminJobDetail>(`admin/jobs/${id}`);
   const techs = useQuery<AdminTechnician[]>('admin/technicians');
   const now = useNow(5000);
@@ -174,8 +155,19 @@ export function JobDrawer({ id, onClose }: { id: string; onClose: () => void }) 
       </>
     ) : undefined;
 
+  const Frame = mode === 'page' ? PageFrame : Drawer;
+  const fullPageLink =
+    mode === 'drawer' && job ? (
+      <Link
+        href={`/admin/jobs/${id}`}
+        className="mr-auto inline-flex min-h-9 items-center rounded-sm px-2 text-sm font-medium text-primary hover:underline"
+      >
+        Open full page
+      </Link>
+    ) : null;
+
   return (
-    <Drawer
+    <Frame
       title={job ? `${job.assetId}` : 'Job'}
       subtitle={
         job ? (
@@ -192,7 +184,14 @@ export function JobDrawer({ id, onClose }: { id: string; onClose: () => void }) 
         ) : undefined
       }
       onClose={onClose}
-      footer={footer}
+      footer={
+        fullPageLink || footer ? (
+          <>
+            {fullPageLink}
+            {footer}
+          </>
+        ) : undefined
+      }
     >
       {detail.loading && !d ? (
         <div className="space-y-3 p-5" role="status" aria-label="Loading job">
@@ -396,6 +395,6 @@ export function JobDrawer({ id, onClose }: { id: string; onClose: () => void }) 
           </Select>
         </ConfirmDialog>
       )}
-    </Drawer>
+    </Frame>
   );
 }

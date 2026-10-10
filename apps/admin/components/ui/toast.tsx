@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
 import { ApiError } from '@/lib/client';
+import { correlationOf, friendlyMessage } from '@/lib/errors';
 import { cn } from '@/lib/cn';
 import { CopyButton } from './values';
 
@@ -21,9 +22,16 @@ interface ToastApi {
   info: (title: string, detail?: string) => void;
   /** Accepts an ApiError (message from the envelope + copyable correlation id) or any error. */
   error: (error: unknown, fallback?: string) => void;
+  /** Plain-language failure for end users: never shows error codes; keeps the correlation id copyable for support. */
+  problem: (error: unknown) => void;
 }
 
-const ToastContext = createContext<ToastApi>({ success: () => {}, info: () => {}, error: () => {} });
+const ToastContext = createContext<ToastApi>({
+  success: () => {},
+  info: () => {},
+  error: () => {},
+  problem: () => {},
+});
 export const useToast = (): ToastApi => useContext(ToastContext);
 
 const ICON = { success: CheckCircle2, error: AlertCircle, info: Info } as const;
@@ -46,6 +54,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     () => ({
       success: (title, detail) => push({ kind: 'success', title, detail }),
       info: (title, detail) => push({ kind: 'info', title, detail }),
+      problem: (error) =>
+        push({ kind: 'error', title: friendlyMessage(error), correlationId: correlationOf(error) }),
       error: (error, fallback = 'Something went wrong') =>
         push({
           kind: 'error',

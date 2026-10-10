@@ -5,8 +5,10 @@ import './globals.css';
 const inter = Inter({ variable: '--font-inter', subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'Dispatch Operations',
-  description: 'Field asset inspection & repair dispatch: operations console',
+  title: { default: 'Field Dispatch — Enterprise Field Service Engine', template: '%s · Field Dispatch' },
+  description:
+    'On-demand field asset inspection and verified repair dispatch platform with PostGIS spatial matching and arrival OTP verification.',
+  icons: { icon: '/icon.svg' },
 };
 
 export const viewport: Viewport = {

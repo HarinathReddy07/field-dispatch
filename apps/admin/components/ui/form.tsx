@@ -1,5 +1,33 @@
 import { useId } from 'react';
 import { cn } from '@/lib/cn';
+import { Button } from './button';
+
+/**
+ * Row that holds a page's filter controls (Input, Select, Toggle). With `onClear` it shows a "Clear filters"
+ * button, enabled only while `active` so it is never a dead control.
+ */
+export function FilterBar({
+  label,
+  children,
+  active = false,
+  onClear,
+}: {
+  label: string;
+  children: React.ReactNode;
+  active?: boolean;
+  onClear?: () => void;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap items-end gap-3">
+      {children}
+      {onClear && (
+        <Button variant="ghost" disabled={!active} onClick={onClear}>
+          Clear filters
+        </Button>
+      )}
+    </div>
+  );
+}
 
 interface FieldShellProps {
   label: string;

@@ -8,8 +8,12 @@ import {
   formatDuration,
   formatMoney,
   generateCssVariables,
+  categoryLabel,
+  isFinishedState,
+  jobActionsFor,
   journeyOf,
   relativeTime,
+  roleHeadline,
   stateStyle,
   stateStyles,
   tailwindPreset,
@@ -36,14 +40,20 @@ describe('state styles', () => {
     },
   );
 
-  it('uses the exact colours from the design plan', () => {
+  it('uses one colour family per meaning on every screen', () => {
     expect(stateStyles.CONFIRMED).toMatchObject({
       label: 'Assigned',
-      light: { bg: '#E0E7FF', text: '#3730A3' },
-      dark: { bg: '#1E1B4B', text: '#C7D2FE' },
+      light: { bg: '#DBEAFE', text: '#1E40AF' }, // blue = assigned
+      dark: { bg: '#172554', text: '#BFDBFE' },
     });
     expect(stateStyles.UNDER_REVIEW.label).toBe('Awaiting review');
-    expect(stateStyles.REWORK.light).toEqual({ bg: '#FFEDD5', text: '#9A3412' });
+    expect(stateStyles.REQUESTED.light).toEqual({ bg: '#FEF3C7', text: '#92400E' }); // amber = requested
+    expect(stateStyles.ARRIVED.light).toEqual({ bg: '#E0E7FF', text: '#3730A3' }); // indigo = arrived
+    expect(stateStyles.IN_PROGRESS.light).toEqual({ bg: '#EDE9FE', text: '#5B21B6' }); // violet = in progress
+    expect(stateStyles.UNDER_REVIEW.light).toEqual({ bg: '#FFEDD5', text: '#9A3412' }); // orange = under review
+    expect(stateStyles.REWORK.light).toEqual({ bg: '#FEE2E2', text: '#991B1B' }); // red = rework
+    expect(stateStyles.SETTLED.light).toEqual({ bg: '#DCFCE7', text: '#166534' }); // green = completed
+    expect(stateStyles.CANCELLED.light).toEqual({ bg: '#F1F5F9', text: '#334155' }); // grey = cancelled
   });
 
   it('falls back to a neutral style for an unknown state', () => {
@@ -146,9 +156,9 @@ describe('css generation', () => {
   it('emits a light :root block and a .dark block', () => {
     expect(css).toContain(':root {');
     expect(css).toContain('.dark {');
-    expect(css).toContain('--color-primary: #1D4ED8;');
+    expect(css).toContain('--color-primary: #2563EB;');
     expect(css).toContain('--color-primary: #60A5FA;');
-    expect(css).toContain('--state-in-progress-bg: #FEF3C7;');
+    expect(css).toContain('--state-in-progress-bg: #EDE9FE;');
   });
 
   it('defines a variable for every colour token and every state in both themes', () => {
@@ -170,5 +180,27 @@ describe('css generation', () => {
     expect(tailwindThemeCss()).toContain('--color-surface-muted: var(--color-surface-muted);');
     expect(tailwindPreset.darkMode).toBe('class');
     expect(tailwindPreset.theme.extend.colors['primary-soft']).toBe('var(--color-primary-soft)');
+  });
+});
+
+describe('role copy', () => {
+  it('every state a requester or technician can see has guidance or falls back to the label', () => {
+    expect(roleHeadline('REQUESTER', 'UNDER_REVIEW')).toMatch(/approve/i);
+    expect(roleHeadline('TECHNICIAN', 'CONFIRMED')).toMatch(/arrival code/i);
+    expect(roleHeadline('ADMIN', 'CONFIRMED')).toBeUndefined();
+  });
+
+  it('offers each role only its own controls', () => {
+    expect(jobActionsFor('REQUESTER', 'UNDER_REVIEW')).toEqual(['REVIEW']);
+    expect(jobActionsFor('TECHNICIAN', 'IN_PROGRESS')).toEqual(['UPLOAD_EVIDENCE', 'FINISH']);
+    expect(jobActionsFor('TECHNICIAN', 'UNDER_REVIEW')).toEqual([]);
+    expect(jobActionsFor('ADMIN', 'IN_PROGRESS')).toEqual([]);
+  });
+
+  it('knows which states are finished and names categories', () => {
+    expect(isFinishedState('SETTLED')).toBe(true);
+    expect(isFinishedState('IN_PROGRESS')).toBe(false);
+    expect(categoryLabel('ELECTRICAL_INSPECTION')).toBe('Electrical inspection');
+    expect(categoryLabel('SOME_NEW_THING')).toBe('some new thing');
   });
 });

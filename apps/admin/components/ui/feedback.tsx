@@ -1,7 +1,17 @@
-import { AlertCircle, Inbox } from 'lucide-react';
+import { AlertCircle, Inbox, Loader2, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from './button';
 import { CopyButton } from './values';
+
+/** Whole-panel loading indicator for content that has no table or card shape to skeleton. */
+export function LoadingState({ label = 'Loading…' }: { label?: string }) {
+  return (
+    <div role="status" className="flex items-center justify-center gap-2 px-4 py-10 text-sm text-muted">
+      <Loader2 aria-hidden size={20} strokeWidth={1.75} className="animate-spin motion-reduce:animate-none" />
+      {label}
+    </div>
+  );
+}
 
 export function Skeleton({ className = 'h-4 w-full' }: { className?: string }) {
   return (
@@ -34,14 +44,16 @@ export function EmptyState({
   title,
   hint,
   action,
+  icon: Icon = Inbox,
 }: {
   title: string;
   hint?: string;
   action?: React.ReactNode;
+  icon?: LucideIcon;
 }) {
   return (
     <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-      <Inbox aria-hidden size={28} strokeWidth={1.5} className="text-subtle" />
+      <Icon aria-hidden size={28} strokeWidth={1.5} className="text-subtle" />
       <p className="font-medium">{title}</p>
       {hint && <p className="max-w-sm text-sm text-muted">{hint}</p>}
       {action}

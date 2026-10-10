@@ -78,7 +78,7 @@ export function LiveBoard() {
   );
 
   const open = useCallback(
-    (id: string | null) => router.push(id ? `/live?job=${id}` : '/live', { scroll: false }),
+    (id: string | null) => router.push(id ? `/admin/live?job=${id}` : '/admin/live', { scroll: false }),
     [router],
   );
 

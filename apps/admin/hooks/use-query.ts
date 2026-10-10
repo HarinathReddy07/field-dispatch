@@ -19,12 +19,16 @@ interface Snapshot<T> {
   fetchedAt: number;
 }
 
-/** Minimal fetch hook: keeps the previous data visible while refetching (no flicker on live updates). */
-export function useQuery<T>(path: string): QueryState<T> {
+/**
+ * Minimal fetch hook: keeps the previous data visible while refetching (no flicker on live updates).
+ * Pass `null` to hold the query until its inputs exist (nothing is fetched and `loading` stays false).
+ */
+export function useQuery<T>(path: string | null): QueryState<T> {
   const [snap, setSnap] = useState<Snapshot<T>>({ path: '', data: null, error: null, fetchedAt: 0 });
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    if (path === null) return;
     let alive = true; // a newer request (or unmount) supersedes this one
     api<T>(path)
       .then((data) => alive && setSnap({ path, data, error: null, fetchedAt: Date.now() }))
@@ -42,7 +46,7 @@ export function useQuery<T>(path: string): QueryState<T> {
   return {
     data: snap.data,
     error: snap.error,
-    loading: snap.path !== path,
+    loading: path !== null && snap.path !== path,
     fetchedAt: snap.fetchedAt,
     refetch,
   };

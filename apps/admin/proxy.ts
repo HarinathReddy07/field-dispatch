@@ -3,12 +3,18 @@ import { ACCESS_COOKIE, REFRESH_COOKIE } from './lib/config';
 
 /**
  * Optimistic gate only (docs: Proxy is not an authorization layer): no session cookie -> login.
- * Real checks happen server-side in app/(console)/layout.tsx (role from the API) and in every API call.
+ * Real checks happen server-side in the admin, requester and technician layouts (role from the API) and in every API call.
  */
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const open =
-    pathname === '/login' || pathname === '/api/session/login' || pathname === '/api/session/logout';
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/register' ||
+    pathname === '/unauthorized' ||
+    pathname === '/api/session/login' ||
+    pathname === '/api/session/otp' ||
+    pathname === '/api/session/logout';
   if (open) return NextResponse.next();
 
   const hasSession = req.cookies.has(ACCESS_COOKIE) || req.cookies.has(REFRESH_COOKIE);

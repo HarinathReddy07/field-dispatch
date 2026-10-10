@@ -12,12 +12,15 @@ interface LiveValue {
   /** Increments after every RE-connection; pages refetch their REST snapshot when it changes. */
   resync: number;
   subscribe: (h: Handler) => () => void;
+  /** Joins a request's room (technician position updates). Re-joined after every reconnect; returns the leave function. */
+  joinRequest: (requestId: string) => () => void;
 }
 
 const LiveContext = createContext<LiveValue>({
   status: 'connecting',
   resync: 0,
   subscribe: () => () => undefined,
+  joinRequest: () => () => undefined,
 });
 export const useLive = (): LiveValue => useContext(LiveContext);
 
@@ -37,6 +40,8 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
   const [resync, setResync] = useState(0);
   const handlers = useRef(new Set<Handler>());
   const seen = useRef(new Set<string>());
+  const socketRef = useRef<Socket | undefined>(undefined);
+  const rooms = useRef(new Map<string, number>());
 
   useEffect(() => {
     let socket: Socket | undefined;
@@ -67,8 +72,10 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
           void fetchToken().then((t) => cb({ token: t?.token ?? '' }));
         },
       });
+      socketRef.current = socket;
       socket.on('connect', () => {
         attempts = 0;
+        for (const requestId of rooms.current.keys()) socket?.emit('request.subscribe', { requestId });
         setStatus('live');
         if (everConnected) setResync((n) => n + 1); // missed events: refetch the REST snapshot
         everConnected = true;
@@ -96,6 +103,7 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
       if (retry) clearTimeout(retry);
       socket?.close();
+      socketRef.current = undefined;
     };
   }, []);
 
@@ -103,7 +111,23 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
     handlers.current.add(h);
     return () => handlers.current.delete(h);
   }, []);
-  const value = useMemo(() => ({ status, resync, subscribe }), [status, resync, subscribe]);
+  const joinRequest = useCallback((requestId: string) => {
+    rooms.current.set(requestId, (rooms.current.get(requestId) ?? 0) + 1);
+    if (socketRef.current?.connected) socketRef.current.emit('request.subscribe', { requestId });
+    return () => {
+      const left = (rooms.current.get(requestId) ?? 1) - 1;
+      if (left > 0) {
+        rooms.current.set(requestId, left);
+        return;
+      }
+      rooms.current.delete(requestId);
+      if (socketRef.current?.connected) socketRef.current.emit('request.unsubscribe', { requestId });
+    };
+  }, []);
+  const value = useMemo(
+    () => ({ status, resync, subscribe, joinRequest }),
+    [status, resync, subscribe, joinRequest],
+  );
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;
 }
 
@@ -136,4 +160,24 @@ export function useLiveRefresh(onChange: () => void, filter?: (e: EventEnvelope)
     }
     cb.current(); // reconnect => refetch the REST snapshot
   }, [resync]);
+}
+
+/** Receives live technician positions for one request (subscribes to its room while mounted). */
+export function useRequestRoom(requestId: string | null, onEvent: Handler): void {
+  const { joinRequest, subscribe } = useLive();
+  const cb = useRef(onEvent);
+  useEffect(() => {
+    cb.current = onEvent;
+  });
+  useEffect(() => {
+    if (!requestId) return;
+    const leave = joinRequest(requestId);
+    const off = subscribe((e) => {
+      if (e.requestId === requestId) cb.current(e);
+    });
+    return () => {
+      off();
+      leave();
+    };
+  }, [requestId, joinRequest, subscribe]);
 }

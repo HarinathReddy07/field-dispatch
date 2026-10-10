@@ -1,17 +1,56 @@
+import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
+
+export interface Crumb {
+  label: string;
+  /** Omit on the last crumb (the current page). */
+  href?: string;
+}
+
+/** Trail above a page title. The last crumb is the current page (`aria-current`), earlier ones are links. */
+export function Breadcrumbs({ items }: { items: Crumb[] }) {
+  if (items.length === 0) return null;
+  return (
+    <nav aria-label="Breadcrumb" className="mb-1">
+      <ol className="flex flex-wrap items-center gap-1 text-xs text-muted">
+        {items.map((c, i) => {
+          const last = i === items.length - 1;
+          return (
+            <li key={`${i}-${c.label}`} className="flex items-center gap-1">
+              {c.href && !last ? (
+                <Link href={c.href} className="rounded-sm font-medium hover:text-ink hover:underline">
+                  {c.label}
+                </Link>
+              ) : (
+                <span aria-current={last ? 'page' : undefined} className={cn(last && 'text-ink')}>
+                  {c.label}
+                </span>
+              )}
+              {!last && <ChevronRight aria-hidden size={14} strokeWidth={1.75} />}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
 
 export function PageHeader({
   title,
   description,
   actions,
+  breadcrumbs,
 }: {
   title: string;
   description?: string;
   actions?: React.ReactNode;
+  breadcrumbs?: Crumb[];
 }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
+        {breadcrumbs && <Breadcrumbs items={breadcrumbs} />}
         <h1 className="text-[22px] leading-7 font-semibold">{title}</h1>
         {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
       </div>

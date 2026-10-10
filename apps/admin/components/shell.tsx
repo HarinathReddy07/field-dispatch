@@ -11,6 +11,7 @@ import {
   Map as MapIcon,
   Menu,
   Moon,
+  Receipt,
   ScrollText,
   Sun,
   Users,
@@ -21,18 +22,22 @@ import { cn } from '@/lib/cn';
 import { Button, ConnectionPill } from './ui';
 import { useDialog, useIsClient } from './ui/use-dialog';
 
-const NAV: { href: string; label: string; title: string; icon: LucideIcon }[] = [
-  { href: '/dashboard', label: 'Dashboard', title: 'Operations dashboard', icon: LayoutDashboard },
-  { href: '/live', label: 'Live board', title: 'Live job board', icon: MapIcon },
-  { href: '/technicians', label: 'Technicians', title: 'Technicians', icon: Users },
-  { href: '/audit', label: 'Audit', title: 'Audit log', icon: ScrollText },
+const NAV: { href: string; label: string; title: string; icon: LucideIcon; exact?: boolean }[] = [
+  { href: '/admin', label: 'Dashboard', title: 'Operations dashboard', icon: LayoutDashboard, exact: true },
+  { href: '/admin/live', label: 'Live board', title: 'Live job board', icon: MapIcon },
+  { href: '/admin/technicians', label: 'Technicians', title: 'Technicians', icon: Users },
+  { href: '/admin/settlements', label: 'Settlements', title: 'Settlement ledger', icon: Receipt },
+  { href: '/admin/audit', label: 'Audit', title: 'Audit log', icon: ScrollText },
 ];
+
+const isActive = (path: string, n: (typeof NAV)[number]) =>
+  n.exact ? path === n.href : path === n.href || path.startsWith(`${n.href}/`);
 
 function NavLinks({ path, onNavigate }: { path: string; onNavigate?: () => void }) {
   return (
     <nav aria-label="Primary" className="flex flex-col gap-1 p-3">
       {NAV.map((n) => {
-        const active = path === n.href || path.startsWith(`${n.href}/`);
+        const active = isActive(path, n);
         const Icon = n.icon;
         return (
           <Link
@@ -113,7 +118,8 @@ export function ThemeToggle() {
   );
 }
 
-function AdminMenu({ name }: { name: string }) {
+/** Account menu with sign-out; used by the admin console and both portals. */
+export function AccountMenu({ name }: { name: string }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const box = useRef<HTMLDivElement>(null);
@@ -174,7 +180,9 @@ function AdminMenu({ name }: { name: string }) {
 export function Shell({ name, children }: { name: string; children: React.ReactNode }) {
   const path = usePathname();
   const [navOpen, setNavOpen] = useState(false);
-  const title = NAV.find((n) => path === n.href || path.startsWith(`${n.href}/`))?.title ?? 'Dispatch Ops';
+  const title =
+    NAV.find((n) => isActive(path, n))?.title ??
+    (path.startsWith('/admin/jobs/') ? 'Job details' : 'Dispatch Ops');
 
   return (
     <div className="relative min-h-screen">
@@ -198,7 +206,7 @@ export function Shell({ name, children }: { name: string; children: React.ReactN
           <p className="min-w-0 flex-1 truncate text-base font-semibold">{title}</p>
           <ConnectionPill />
           <ThemeToggle />
-          <AdminMenu name={name} />
+          <AccountMenu name={name} />
         </header>
         <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 lg:px-6">{children}</main>
       </div>
