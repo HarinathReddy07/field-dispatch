@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -35,7 +35,7 @@ const ROLE_OPTIONS: { id: RoleChoice; icon: typeof User; label: string; desc: st
   },
 ];
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
   const defaultRole: RoleChoice = params.get('role') === 'tech' ? 'TECHNICIAN' : 'REQUESTER';
@@ -327,5 +327,19 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg)]">
+          <Loader2 className="animate-spin text-[var(--color-primary)]" size={32} />
+        </div>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }
